@@ -256,3 +256,7 @@ Replace the default Tauri icons with your own:
 | `npm run lint` | Run Oxlint |
 | `npm run tauri dev` | Start Tauri + Vite in development mode |
 | `npm run tauri build` | Build the desktop app for the current platform |
+
+## License
+
+MIT — see [LICENSE](LICENSE).
