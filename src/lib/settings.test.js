@@ -60,8 +60,18 @@ describe('settingsToConversionOptions', () => {
       ...DEFAULT_SETTINGS,
       outputLocation: { defaultFolder: '/custom/path' },
     };
-    const result = settingsToConversionOptions(settings, '/explicit');
+    const result = settingsToConversionOptions(settings, { outputFolder: '/explicit' });
     expect(result.outputFolder).toBe('/explicit');
+  });
+
+  it('passes bookId through to options', () => {
+    const result = settingsToConversionOptions(DEFAULT_SETTINGS, { bookId: 'abc-123' });
+    expect(result.bookId).toBe('abc-123');
+  });
+
+  it('defaults bookId to null when not provided', () => {
+    const result = settingsToConversionOptions(DEFAULT_SETTINGS);
+    expect(result.bookId).toBeNull();
   });
 });
 
