@@ -298,6 +298,64 @@ describe('ImportContext', () => {
     });
   });
 
+  describe('SET_STORAGE_INFO', () => {
+    it('sets bookId and storedPdfPath on a file', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_STORAGE_INFO',
+          path: '/a.pdf',
+          bookId: 'uuid-1234',
+          storedPdfPath: '/app/books/uuid-1234/source.pdf',
+        });
+      });
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.bookId).toBe('uuid-1234');
+      expect(file.storedPdfPath).toBe('/app/books/uuid-1234/source.pdf');
+    });
+
+    it('does not modify other file properties', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: { title: 'Test' } }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_STORAGE_INFO',
+          path: '/a.pdf',
+          bookId: 'uuid-5678',
+          storedPdfPath: '/app/books/uuid-5678/source.pdf',
+        });
+      });
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.name).toBe('a.pdf');
+      expect(file.status).toBe('ready');
+      expect(file.metadata.title).toBe('Test');
+    });
+
+    it('ignores SET_STORAGE_INFO for non-existent file', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_STORAGE_INFO',
+          path: '/nonexistent.pdf',
+          bookId: 'uuid-1234',
+          storedPdfPath: '/app/books/uuid-1234/source.pdf',
+        });
+      });
+      expect(result.current.state.files.size).toBe(0);
+    });
+  });
+
   describe('UPDATE_STATUS clears conversion fields', () => {
     it('clears conversion fields when set back to ready', () => {
       const { result } = renderImportContext();

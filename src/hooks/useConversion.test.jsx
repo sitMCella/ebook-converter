@@ -342,6 +342,60 @@ describe('useConversion', () => {
     expect(result.current.conversionCtx.state.activeFile).toBeNull();
   });
 
+  it('passes bookId to settingsToConversionOptions', async () => {
+    const { result } = renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', bookId: 'uuid-123', storedPdfPath: '/stored/a.pdf' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(settingsToConversionOptions).toHaveBeenCalledWith(
+      expect.anything(),
+      { bookId: 'uuid-123' },
+    );
+  });
+
+  it('uses storedPdfPath for conversion when available', async () => {
+    const { result } = renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', bookId: 'uuid-123', storedPdfPath: '/stored/a.pdf' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(convertPdfToEpub).toHaveBeenCalledWith('/stored/a.pdf', { outputFolder: '/out' });
+  });
+
+  it('falls back to original path when storedPdfPath is absent', async () => {
+    const { result } = renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(convertPdfToEpub).toHaveBeenCalledWith('/a.pdf', { outputFolder: '/out' });
+  });
+
   it('reports isConverting based on activeFile', async () => {
     const { result } = renderUseConversion();
 

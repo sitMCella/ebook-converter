@@ -167,6 +167,43 @@ describe('useImport', () => {
     expect(file.name).toBe('report.pdf');
   });
 
+  it('calls importPdf after validation and stores bookId', async () => {
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/test.pdf']);
+    });
+
+    expect(importPdf).toHaveBeenCalledWith('/test.pdf');
+    const file = result.current.context.state.files.get('/test.pdf');
+    expect(file.bookId).toBe('test-uuid-1234');
+    expect(file.storedPdfPath).toBe('/stored/test.pdf');
+  });
+
+  it('does not call importPdf when validation fails', async () => {
+    validatePdf.mockResolvedValue({ status: 'encrypted' });
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/encrypted.pdf']);
+    });
+
+    expect(importPdf).not.toHaveBeenCalled();
+  });
+
+  it('sets error when importPdf fails', async () => {
+    importPdf.mockRejectedValue(new Error('Disk full'));
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/test.pdf']);
+    });
+
+    const file = result.current.context.state.files.get('/test.pdf');
+    expect(file.status).toBe('error');
+    expect(file.errorMessage).toContain('Disk full');
+  });
+
   it('sets isImporting to false after import completes', async () => {
     const { result } = renderUseImport();
 
