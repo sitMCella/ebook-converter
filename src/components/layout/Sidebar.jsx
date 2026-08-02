@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom';
-import { Upload, FileText, Book, Settings } from 'lucide-react';
+import { Upload, FileText, Book, Settings, RefreshCw } from 'lucide-react';
 
 const navItems = [
   { to: '/import', icon: Upload, label: 'Import' },
+  { to: '/converting', icon: RefreshCw, label: 'Converting' },
   { to: '/library', icon: FileText, label: 'Library' },
   { to: '/converted', icon: Book, label: 'Converted' },
 ];

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
+import { ConversionProvider } from '../../contexts/ConversionContext';
 import { BatchActions } from './BatchActions';
 
 const mockNavigate = vi.fn();
@@ -15,7 +16,9 @@ vi.mock('react-router-dom', async () => {
 function Wrapper({ children }) {
   return (
     <ImportProvider>
-      <MemoryRouter>{children}</MemoryRouter>
+      <ConversionProvider>
+        <MemoryRouter>{children}</MemoryRouter>
+      </ConversionProvider>
     </ImportProvider>
   );
 }
@@ -131,7 +134,7 @@ describe('BatchActions', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('navigates to /converted when "Convert selected" is clicked', async () => {
+  it('navigates to /converting when "Convert selected" is clicked', async () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
@@ -144,6 +147,6 @@ describe('BatchActions', () => {
       </Wrapper>
     );
     await user.click(screen.getByText('Convert selected').closest('button'));
-    expect(mockNavigate).toHaveBeenCalledWith('/converted');
+    expect(mockNavigate).toHaveBeenCalledWith('/converting');
   });
 });

@@ -225,6 +225,108 @@ describe('ImportContext', () => {
     });
   });
 
+  describe('SET_CONVERSION_PROGRESS', () => {
+    it('updates progress on a converting file', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: null }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'UPDATE_STATUS', path: '/a.pdf', status: 'converting' });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_CONVERSION_PROGRESS',
+          path: '/a.pdf',
+          percent: 42,
+          stage: 'extracting_text',
+        });
+      });
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.conversionProgress).toBe(42);
+      expect(file.conversionStage).toBe('extracting_text');
+    });
+
+    it('ignores progress when file is not converting', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: null }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_CONVERSION_PROGRESS',
+          path: '/a.pdf',
+          percent: 42,
+          stage: 'extracting_text',
+        });
+      });
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.conversionProgress).toBeUndefined();
+    });
+  });
+
+  describe('SET_CONVERSION_RESULT', () => {
+    it('sets status to converted with output info', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: null }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'UPDATE_STATUS', path: '/a.pdf', status: 'converting' });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_CONVERSION_RESULT',
+          path: '/a.pdf',
+          outputPath: '/output/a.epub',
+          result: { outputPath: '/output/a.epub', chapters: 5, images: 2, fileSize: 50000 },
+        });
+      });
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.status).toBe('converted');
+      expect(file.outputPath).toBe('/output/a.epub');
+      expect(file.conversionResult.chapters).toBe(5);
+    });
+  });
+
+  describe('UPDATE_STATUS clears conversion fields', () => {
+    it('clears conversion fields when set back to ready', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: null }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'UPDATE_STATUS', path: '/a.pdf', status: 'converting' });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_CONVERSION_PROGRESS',
+          path: '/a.pdf',
+          percent: 50,
+          stage: 'extracting_text',
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'UPDATE_STATUS', path: '/a.pdf', status: 'ready' });
+      });
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.conversionProgress).toBeUndefined();
+      expect(file.conversionStage).toBeUndefined();
+    });
+  });
+
   describe('unknown action', () => {
     it('returns current state for unknown action type', () => {
       const { result } = renderImportContext();

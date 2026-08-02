@@ -31,10 +31,42 @@ function importReducer(state, action) {
       const newFiles = new Map(state.files);
       const file = newFiles.get(action.path);
       if (file) {
-        newFiles.set(action.path, {
+        const updated = {
           ...file,
           status: action.status,
           errorMessage: action.errorMessage,
+        };
+        if (action.status === 'ready' || action.status === 'error') {
+          delete updated.conversionProgress;
+          delete updated.conversionStage;
+        }
+        newFiles.set(action.path, updated);
+      }
+      return { ...state, files: newFiles };
+    }
+    case 'SET_CONVERSION_PROGRESS': {
+      const newFiles = new Map(state.files);
+      const file = newFiles.get(action.path);
+      if (file && file.status === 'converting') {
+        newFiles.set(action.path, {
+          ...file,
+          conversionProgress: action.percent,
+          conversionStage: action.stage,
+        });
+      }
+      return { ...state, files: newFiles };
+    }
+    case 'SET_CONVERSION_RESULT': {
+      const newFiles = new Map(state.files);
+      const file = newFiles.get(action.path);
+      if (file) {
+        newFiles.set(action.path, {
+          ...file,
+          status: 'converted',
+          outputPath: action.outputPath,
+          conversionResult: action.result,
+          conversionProgress: undefined,
+          conversionStage: undefined,
         });
       }
       return { ...state, files: newFiles };
