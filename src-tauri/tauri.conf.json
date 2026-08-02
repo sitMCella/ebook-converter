@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Ebook Converter",
-        "width": 1024,
-        "height": 768,
-        "minWidth": 640,
-        "minHeight": 480,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 640,
         "resizable": true,
         "fullscreen": false
       }
