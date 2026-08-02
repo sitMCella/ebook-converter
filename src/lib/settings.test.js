@@ -33,7 +33,7 @@ describe('mergeSettings', () => {
 
 describe('settingsToConversionOptions', () => {
   it('maps settings to conversion options shape', () => {
-    const result = settingsToConversionOptions(DEFAULT_SETTINGS, '/output');
+    const result = settingsToConversionOptions(DEFAULT_SETTINGS, { outputFolder: '/output' });
     expect(result.outputFolder).toBe('/output');
     expect(result.structure).toBe(DEFAULT_SETTINGS.structure);
     expect(result.images).toBe(DEFAULT_SETTINGS.images);

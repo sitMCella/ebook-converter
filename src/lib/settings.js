@@ -101,12 +101,13 @@ export function getEffectiveSettings(globalSettings, documentOverrides) {
   return mergeSettings(globalSettings, documentOverrides);
 }
 
-export function settingsToConversionOptions(settings, outputFolder) {
+export function settingsToConversionOptions(settings, { outputFolder, bookId } = {}) {
   return {
     structure: settings.structure,
     images: settings.images,
     output: settings.output,
     pageHandling: settings.pageHandling,
     outputFolder: outputFolder || settings.outputLocation?.defaultFolder || '~/Documents/Ebooks',
+    bookId: bookId || null,
   };
 }

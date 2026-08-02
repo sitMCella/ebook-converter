@@ -6,6 +6,7 @@ vi.mock('../lib/tauri', () => ({
   validatePdf: vi.fn(),
   getPdfMetadata: vi.fn(),
   getFileSize: vi.fn(),
+  importPdf: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
@@ -14,7 +15,7 @@ vi.mock('sonner', () => ({
 
 import { useImport } from './useImport';
 import { useImportContext } from '../contexts/ImportContext';
-import { validatePdf, getPdfMetadata, getFileSize } from '../lib/tauri';
+import { validatePdf, getPdfMetadata, getFileSize, importPdf } from '../lib/tauri';
 import { toast } from 'sonner';
 
 function wrapper({ children }) {
@@ -36,6 +37,7 @@ describe('useImport', () => {
     vi.clearAllMocks();
     getFileSize.mockResolvedValue(1024);
     validatePdf.mockResolvedValue({ status: 'valid' });
+    importPdf.mockResolvedValue({ bookId: 'test-uuid-1234', storedPdfPath: '/stored/test.pdf' });
     getPdfMetadata.mockResolvedValue({
       title: 'Test',
       author: 'Author',

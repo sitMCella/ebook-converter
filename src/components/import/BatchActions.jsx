@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRightLeft } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
 import { useConversion } from '../../hooks/useConversion';
+import { deleteBook } from '../../lib/tauri';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
@@ -18,8 +19,19 @@ export function BatchActions() {
     return file?.status === 'ready';
   });
 
-  const handleRemove = () => {
-    dispatch({ type: 'REMOVE_FILES', paths: Array.from(state.selectedPaths) });
+  const handleRemove = async () => {
+    const paths = Array.from(state.selectedPaths);
+    for (const path of paths) {
+      const file = state.files.get(path);
+      if (file?.bookId) {
+        try {
+          await deleteBook(file.bookId);
+        } catch (e) {
+          console.warn('Failed to delete book storage:', e);
+        }
+      }
+    }
+    dispatch({ type: 'REMOVE_FILES', paths });
     setShowConfirm(false);
   };
 
@@ -51,7 +63,7 @@ export function BatchActions() {
       <ConfirmDialog
         open={showConfirm}
         title="Remove files"
-        message={`Remove ${selectedCount} file(s) from the import list? The source PDFs on disk are not affected.`}
+        message={`Remove ${selectedCount} file(s) from the import list? This will also delete the stored copies.`}
         onConfirm={handleRemove}
         onCancel={() => setShowConfirm(false)}
       />
