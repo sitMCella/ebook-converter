@@ -1,6 +1,7 @@
 use super::ImageOptions;
 use lopdf::{Document, Object};
 
+#[allow(dead_code)]
 pub struct ExtractedImage {
     pub id: String,
     pub data: Vec<u8>,

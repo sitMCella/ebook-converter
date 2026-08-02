@@ -2,6 +2,7 @@ use super::structure_detector::StructuredContent;
 use super::PageHandlingOptions;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Chapter {
     pub title: String,
     pub content: Vec<StructuredContent>,

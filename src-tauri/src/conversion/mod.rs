@@ -24,6 +24,7 @@ pub struct ConversionOptions {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct StructureOptions {
     pub detect_headings: bool,
     pub detect_toc: bool,
@@ -45,6 +46,7 @@ pub struct ImageOptions {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct OutputOptions {
     pub epub_version: String,
     pub embed_fonts: bool,
