@@ -146,6 +146,152 @@ describe('ConversionContext', () => {
     expect(getState().logEntries[0].message).toBe('Test log');
   });
 
+  it('clears log entries', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({
+      type: 'ADD_LOG_ENTRY',
+      entry: { timestamp: 1000, message: 'Test', level: 'info' },
+    }));
+    expect(getState().logEntries).toHaveLength(1);
+
+    act(() => dispatch({ type: 'CLEAR_LOG' }));
+    expect(getState().logEntries).toHaveLength(0);
+  });
+
+  it('complete_active adds to completed', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf'] }));
+    act(() => dispatch({ type: 'COMPLETE_ACTIVE', path: '/a.pdf' }));
+
+    expect(getState().completedFiles).toContain('/a.pdf');
+  });
+
+  it('enqueue resets completed and log', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf'] }));
+    act(() => dispatch({ type: 'COMPLETE_ACTIVE', path: '/a.pdf' }));
+    act(() => dispatch({
+      type: 'ADD_LOG_ENTRY',
+      entry: { timestamp: 1000, message: 'done', level: 'info' },
+    }));
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/b.pdf'] }));
+    expect(getState().completedFiles).toEqual([]);
+    expect(getState().logEntries).toEqual([]);
+  });
+
+  it('cancel sets isComplete when files were completed', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf', '/b.pdf'] }));
+    act(() => dispatch({ type: 'COMPLETE_ACTIVE', path: '/a.pdf' }));
+    act(() => dispatch({ type: 'CANCEL_ALL' }));
+
+    expect(getState().isComplete).toBe(true);
+  });
+
+  it('cancel sets isComplete false when no files were completed', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf'] }));
+    act(() => dispatch({ type: 'CANCEL_ALL' }));
+
+    expect(getState().isComplete).toBe(false);
+  });
+
+  it('returns state unchanged for unknown action', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    const before = getState();
+    act(() => dispatch({ type: 'NONEXISTENT_ACTION' }));
+    expect(getState()).toBe(before);
+  });
+
+  it('throws when useConversionContext is used outside provider', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    function Bad() {
+      useConversionContext();
+      return null;
+    }
+    expect(() => render(<Bad />)).toThrow('useConversionContext must be used within a ConversionProvider');
+    spy.mockRestore();
+  });
+
   it('fail_active adds to completed', () => {
     let dispatch, getState;
     function Inner() {
