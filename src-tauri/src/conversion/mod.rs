@@ -39,6 +39,7 @@ pub struct ImageOptions {
     pub extract_images: bool,
     pub image_quality: String,
     pub max_image_width: u32,
+    #[serde(alias = "convertToWebP")]
     pub convert_to_webp: bool,
 }
 
