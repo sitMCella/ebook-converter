@@ -87,6 +87,38 @@ Opens the app at `http://localhost:5173`. File operations fall back to browser A
 npm run lint
 ```
 
+## Testing
+
+### Unit Tests
+
+Unit tests use [Vitest](https://vitest.dev/) with jsdom and [Testing Library](https://testing-library.com/). They cover individual components, hooks, contexts, and utility functions.
+
+```bash
+npm run test
+```
+
+To run in watch mode during development:
+
+```bash
+npm run test:watch
+```
+
+### End-to-End Tests
+
+E2E tests use [Playwright](https://playwright.dev/) against the Vite dev server. They exercise full user flows in a real browser (Chromium).
+
+First-time setup — install the Playwright browser binaries:
+
+```bash
+npx playwright install chromium
+```
+
+Run the tests (the Vite dev server starts automatically):
+
+```bash
+npm run test:e2e
+```
+
 ## Building for Release
 
 ### Local Build
@@ -122,6 +154,9 @@ npm run tauri build -- --bundles msi                     # Windows .msi only
 | `npm run dev` | Start Vite dev server (browser only) |
 | `npm run build` | Build frontend for production |
 | `npm run preview` | Preview the production frontend build |
+| `npm run test` | Run unit tests (Vitest) |
+| `npm run test:watch` | Run unit tests in watch mode |
+| `npm run test:e2e` | Run end-to-end tests (Playwright) |
 | `npm run lint` | Run Oxlint |
 | `npm run tauri dev` | Start Tauri + Vite in development mode |
 | `npm run tauri build` | Build the desktop app for the current platform |
