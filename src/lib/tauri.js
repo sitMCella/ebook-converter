@@ -116,4 +116,38 @@ async function getFileSize(path) {
   return 0;
 }
 
-export { isTauri, openFile, saveFile, openPdfFiles, validatePdf, getPdfMetadata, getFileSize };
+async function convertPdfToEpub(path, options) {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('convert_pdf', { path, options });
+  }
+  return Promise.reject(new Error('Conversion requires the desktop app'));
+}
+
+async function cancelConversion(path) {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('cancel_conversion', { path });
+  }
+}
+
+async function onConversionProgress(callback) {
+  if (isTauri) {
+    const { listen } = await import('@tauri-apps/api/event');
+    return listen('conversion-progress', (event) => callback(event.payload));
+  }
+  return () => {};
+}
+
+export {
+  isTauri,
+  openFile,
+  saveFile,
+  openPdfFiles,
+  validatePdf,
+  getPdfMetadata,
+  getFileSize,
+  convertPdfToEpub,
+  cancelConversion,
+  onConversionProgress,
+};

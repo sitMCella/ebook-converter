@@ -162,12 +162,11 @@ test.describe('Import Screen — Selection and Batch Actions', () => {
     await expect(page.getByText('No files imported yet.')).toBeVisible();
   });
 
-  test('convert selected navigates to converted screen', async ({ page }) => {
+  test('convert selected navigates to converting screen', async ({ page }) => {
     await page.getByRole('checkbox', { name: /select file-a\.pdf/i }).check();
     await page.getByRole('button', { name: /convert selected/i }).click();
 
-    await expect(page).toHaveURL(/\/converted/);
-    await expect(page.getByText('Converted — coming soon')).toBeVisible();
+    await expect(page).toHaveURL(/\/converting/);
   });
 });
 

@@ -57,6 +57,10 @@ pub fn validate_pdf(path: String) -> Result<PdfValidation, String> {
     }
 }
 
+pub fn get_pdf_metadata_internal(path: &str) -> Result<PdfMetadata, String> {
+    get_pdf_metadata(path.to_string())
+}
+
 #[tauri::command]
 pub fn get_pdf_metadata(path: String) -> Result<PdfMetadata, String> {
     let doc = Document::load(&path).map_err(|e| format!("Failed to load PDF: {}", e))?;
