@@ -6,6 +6,7 @@ vi.mock('../lib/tauri', () => ({
   validatePdf: vi.fn(),
   getPdfMetadata: vi.fn(),
   getFileSize: vi.fn(),
+  importPdf: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
@@ -14,7 +15,7 @@ vi.mock('sonner', () => ({
 
 import { useImport } from './useImport';
 import { useImportContext } from '../contexts/ImportContext';
-import { validatePdf, getPdfMetadata, getFileSize } from '../lib/tauri';
+import { validatePdf, getPdfMetadata, getFileSize, importPdf } from '../lib/tauri';
 import { toast } from 'sonner';
 
 function wrapper({ children }) {
@@ -36,6 +37,7 @@ describe('useImport', () => {
     vi.clearAllMocks();
     getFileSize.mockResolvedValue(1024);
     validatePdf.mockResolvedValue({ status: 'valid' });
+    importPdf.mockResolvedValue({ bookId: 'test-uuid-1234', storedPdfPath: '/stored/test.pdf' });
     getPdfMetadata.mockResolvedValue({
       title: 'Test',
       author: 'Author',
@@ -163,6 +165,43 @@ describe('useImport', () => {
 
     const file = result.current.context.state.files.get('/home/user/documents/report.pdf');
     expect(file.name).toBe('report.pdf');
+  });
+
+  it('calls importPdf after validation and stores bookId', async () => {
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/test.pdf']);
+    });
+
+    expect(importPdf).toHaveBeenCalledWith('/test.pdf');
+    const file = result.current.context.state.files.get('/test.pdf');
+    expect(file.bookId).toBe('test-uuid-1234');
+    expect(file.storedPdfPath).toBe('/stored/test.pdf');
+  });
+
+  it('does not call importPdf when validation fails', async () => {
+    validatePdf.mockResolvedValue({ status: 'encrypted' });
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/encrypted.pdf']);
+    });
+
+    expect(importPdf).not.toHaveBeenCalled();
+  });
+
+  it('sets error when importPdf fails', async () => {
+    importPdf.mockRejectedValue(new Error('Disk full'));
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/test.pdf']);
+    });
+
+    const file = result.current.context.state.files.get('/test.pdf');
+    expect(file.status).toBe('error');
+    expect(file.errorMessage).toContain('Disk full');
   });
 
   it('sets isImporting to false after import completes', async () => {

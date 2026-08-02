@@ -6,7 +6,7 @@ import { loadSettings, settingsToConversionOptions } from '../lib/settings';
 
 export function useConversion() {
   const { state: conversionState, dispatch: conversionDispatch } = useConversionContext();
-  const { dispatch: importDispatch } = useImportContext();
+  const { state: importState, dispatch: importDispatch } = useImportContext();
   const isConvertingRef = useRef(false);
   const settingsRef = useRef(null);
 
@@ -46,9 +46,12 @@ export function useConversion() {
 
       try {
         const settings = settingsRef.current || await loadSettings();
-        const options = settingsToConversionOptions(settings);
+        const file = importState.files.get(path);
+        const bookId = file?.bookId;
+        const pdfPath = file?.storedPdfPath || path;
+        const options = settingsToConversionOptions(settings, { bookId });
 
-        const result = await convertPdfToEpub(path, options);
+        const result = await convertPdfToEpub(pdfPath, options);
 
         importDispatch({
           type: 'SET_CONVERSION_RESULT',
@@ -79,7 +82,7 @@ export function useConversion() {
         });
       }
     },
-    [importDispatch, conversionDispatch],
+    [importState.files, importDispatch, conversionDispatch],
   );
 
   const processQueue = useCallback(

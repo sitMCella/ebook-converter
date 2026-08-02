@@ -71,6 +71,18 @@ function importReducer(state, action) {
       }
       return { ...state, files: newFiles };
     }
+    case 'SET_STORAGE_INFO': {
+      const newFiles = new Map(state.files);
+      const file = newFiles.get(action.path);
+      if (file) {
+        newFiles.set(action.path, {
+          ...file,
+          bookId: action.bookId,
+          storedPdfPath: action.storedPdfPath,
+        });
+      }
+      return { ...state, files: newFiles };
+    }
     case 'SET_METADATA': {
       const newFiles = new Map(state.files);
       const file = newFiles.get(action.path);

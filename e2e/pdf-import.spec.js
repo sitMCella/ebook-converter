@@ -133,7 +133,7 @@ test.describe('Import Screen — Selection and Batch Actions', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(/remove 1 file\(s\) from the import list/i)).toBeVisible();
-    await expect(dialog.getByText(/source PDFs on disk are not affected/i)).toBeVisible();
+    await expect(dialog.getByText(/delete the stored copies/i)).toBeVisible();
 
     await dialog.getByRole('button', { name: /confirm/i }).click();
 
