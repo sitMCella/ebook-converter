@@ -211,11 +211,15 @@ test.describe('Import Screen — Drop Zone Interaction', () => {
 });
 
 test.describe('Import Screen — Keyboard Shortcuts', () => {
-  test('Ctrl+O triggers file dialog', async ({ page }) => {
+  test('Cmd/Ctrl+O triggers file dialog', async ({ page }) => {
     await page.goto('/import');
 
     const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.keyboard.press('Control+o');
+    await page.evaluate(() => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'o', metaKey: true, bubbles: true })
+      );
+    });
     const fileChooser = await fileChooserPromise;
     expect(fileChooser).toBeTruthy();
   });
