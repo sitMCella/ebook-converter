@@ -20,6 +20,7 @@ pub struct ConversionOptions {
     pub output: OutputOptions,
     pub page_handling: PageHandlingOptions,
     pub output_folder: String,
+    pub book_id: Option<String>,
 }
 
 #[derive(Deserialize)]

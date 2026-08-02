@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useImportContext } from '../contexts/ImportContext';
-import { validatePdf, getPdfMetadata, getFileSize } from '../lib/tauri';
+import { validatePdf, getPdfMetadata, getFileSize, importPdf } from '../lib/tauri';
 
 export function useImport() {
   const { state, dispatch } = useImportContext();
@@ -72,6 +72,15 @@ export function useImport() {
 
             const metadata = await getPdfMetadata(path);
             dispatch({ type: 'SET_METADATA', path, metadata });
+
+            const stored = await importPdf(path);
+            dispatch({
+              type: 'SET_STORAGE_INFO',
+              path,
+              bookId: stored.bookId,
+              storedPdfPath: stored.storedPdfPath,
+            });
+
             dispatch({ type: 'UPDATE_STATUS', path, status: 'ready' });
           } catch (err) {
             dispatch({

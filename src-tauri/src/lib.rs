@@ -1,5 +1,6 @@
 mod pdf;
 mod conversion;
+mod storage;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -17,6 +18,9 @@ pub fn run() {
       pdf::get_pdf_metadata,
       conversion::convert_pdf,
       conversion::cancel_conversion,
+      storage::import_pdf,
+      storage::delete_book,
+      storage::get_books_dir,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

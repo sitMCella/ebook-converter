@@ -5,6 +5,7 @@ use super::structure_detector;
 use super::text_extractor;
 use super::{ConversionOptions, ConversionProgress, ConversionResult};
 use crate::pdf;
+use crate::storage;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
@@ -105,7 +106,14 @@ pub async fn run_conversion(
 
     emit_progress(app, &path_owned, "assembling_epub", 80, "Generating EPUB structure...");
 
-    let output_path = resolve_output_path(path, &output_folder)?;
+    let output_path = if let Some(ref book_id) = options.book_id {
+        storage::get_epub_output_path(app, book_id)?
+            .to_str()
+            .ok_or_else(|| "Invalid output path".to_string())?
+            .to_string()
+    } else {
+        resolve_output_path(path, &output_folder)?
+    };
 
     if let Some(parent) = std::path::Path::new(&output_path).parent() {
         std::fs::create_dir_all(parent)
