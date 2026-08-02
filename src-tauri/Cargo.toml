@@ -29,6 +29,7 @@ lopdf = "0.34"
 pdf-extract = "0.7"
 epub-builder = "0.7"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+flate2 = "1"
 
 [dev-dependencies]
 tempfile = "3"

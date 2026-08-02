@@ -739,6 +739,7 @@ name = "ebook-converter"
 version = "0.1.0"
 dependencies = [
  "epub-builder",
+ "flate2",
  "image",
  "log",
  "lopdf",

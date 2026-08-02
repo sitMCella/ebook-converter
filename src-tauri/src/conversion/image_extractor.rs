@@ -161,9 +161,7 @@ fn extract_single_image(
         return Err(format!("Unsupported image format: {}", filter));
     }
 
-    let data = stream
-        .decompressed_content()
-        .map_err(|e| format!("Failed to decompress image: {}", e))?;
+    let data = decompress_stream(stream, &filter)?;
 
     let color_space = stream
         .dict
@@ -312,6 +310,37 @@ fn process_dynamic_image(
         width: w,
         height: h,
     })
+}
+
+fn decompress_stream(stream: &lopdf::Stream, filter: &str) -> Result<Vec<u8>, String> {
+    // Try lopdf's built-in decompression first
+    if let Ok(data) = stream.decompressed_content() {
+        return Ok(data);
+    }
+
+    // Fallback: manual decompression for FlateDecode when lopdf fails
+    // (lopdf can choke on streams with indirect-ref DecodeParms)
+    if filter == "FlateDecode" {
+        use flate2::read::ZlibDecoder;
+        use std::io::Read;
+
+        let mut decoder = ZlibDecoder::new(stream.content.as_slice());
+        let mut decompressed = Vec::new();
+        decoder
+            .read_to_end(&mut decompressed)
+            .map_err(|e| format!("Manual FlateDecode failed: {}", e))?;
+        return Ok(decompressed);
+    }
+
+    // No filter — raw bytes are the image data
+    if filter.is_empty() {
+        return Ok(stream.content.clone());
+    }
+
+    Err(format!(
+        "Cannot decompress stream with filter '{}' (lopdf failed and no manual fallback available)",
+        filter
+    ))
 }
 
 fn get_dict_int(dict: &lopdf::Dictionary, key: &[u8]) -> Option<i64> {
