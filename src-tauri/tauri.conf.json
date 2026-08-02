@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Ebook Converter",
   "version": "0.1.0",
-  "identifier": "com.ebook-converter.app",
+  "identifier": "sitmcella.ebook-converter",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
