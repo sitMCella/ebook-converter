@@ -124,7 +124,7 @@ function importReducer(state, action) {
       for (const book of action.books) {
         const path = book.originalPath;
         if (!newFiles.has(path)) {
-          newFiles.set(path, {
+          const fileData = {
             path,
             name: book.originalName,
             size: book.fileSize || 0,
@@ -142,7 +142,17 @@ function importReducer(state, action) {
               producer: book.producer,
               fileSize: book.fileSize,
             },
-          });
+          };
+          if (book.status === 'converted' && book.outputPath) {
+            fileData.outputPath = book.outputPath;
+            fileData.conversionResult = {
+              outputPath: book.outputPath,
+              chapters: book.chapters || 0,
+              images: book.images || 0,
+              fileSize: book.epubFileSize || 0,
+            };
+          }
+          newFiles.set(path, fileData);
         }
       }
       return { ...state, files: newFiles };

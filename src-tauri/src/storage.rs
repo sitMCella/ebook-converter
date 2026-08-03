@@ -26,6 +26,14 @@ pub struct BookMetadata {
     pub modified_date: Option<String>,
     pub producer: Option<String>,
     pub status: String,
+    #[serde(default)]
+    pub output_path: Option<String>,
+    #[serde(default)]
+    pub chapters: Option<usize>,
+    #[serde(default)]
+    pub images: Option<usize>,
+    #[serde(default)]
+    pub epub_file_size: Option<u64>,
 }
 
 pub fn get_books_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -204,6 +212,10 @@ mod tests {
             modified_date: None,
             producer: None,
             status: "ready".to_string(),
+            output_path: None,
+            chapters: None,
+            images: None,
+            epub_file_size: None,
         }
     }
 
