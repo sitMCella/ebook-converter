@@ -72,7 +72,7 @@ describe('ImportListRow', () => {
     const user = userEvent.setup();
     renderRow();
     await user.click(screen.getByText('document.pdf'));
-    expect(mockNavigate).toHaveBeenCalledWith('/library');
+    expect(mockNavigate).toHaveBeenCalledWith('/library', { state: { selectedPath: '/test/document.pdf' } });
   });
 
   it('renders checkbox with selection state', () => {

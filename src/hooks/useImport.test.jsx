@@ -7,6 +7,8 @@ vi.mock('../lib/tauri', () => ({
   getPdfMetadata: vi.fn(),
   getFileSize: vi.fn(),
   importPdf: vi.fn(),
+  saveBookMetadata: vi.fn(),
+  listBooks: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
@@ -15,7 +17,7 @@ vi.mock('sonner', () => ({
 
 import { useImport } from './useImport';
 import { useImportContext } from '../contexts/ImportContext';
-import { validatePdf, getPdfMetadata, getFileSize, importPdf } from '../lib/tauri';
+import { validatePdf, getPdfMetadata, getFileSize, importPdf, saveBookMetadata, listBooks } from '../lib/tauri';
 import { toast } from 'sonner';
 
 function wrapper({ children }) {
@@ -44,6 +46,8 @@ describe('useImport', () => {
       pageCount: 10,
       pdfVersion: '1.7',
     });
+    saveBookMetadata.mockResolvedValue(undefined);
+    listBooks.mockResolvedValue([]);
   });
 
   it('imports valid files and sets metadata', async () => {
@@ -202,6 +206,41 @@ describe('useImport', () => {
     const file = result.current.context.state.files.get('/test.pdf');
     expect(file.status).toBe('error');
     expect(file.errorMessage).toContain('Disk full');
+  });
+
+  it('saves book metadata to disk after import', async () => {
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/test.pdf']);
+    });
+
+    expect(saveBookMetadata).toHaveBeenCalledWith({
+      bookId: 'test-uuid-1234',
+      storedPdfPath: '/stored/test.pdf',
+      originalPath: '/test.pdf',
+      originalName: 'test.pdf',
+      fileSize: 0,
+      title: 'Test',
+      author: 'Author',
+      pageCount: 10,
+      pdfVersion: '1.7',
+      createdDate: null,
+      modifiedDate: null,
+      producer: null,
+      status: 'ready',
+    });
+  });
+
+  it('does not save metadata when bookId is null', async () => {
+    importPdf.mockResolvedValue({ bookId: null, storedPdfPath: '/test.pdf' });
+    const { result } = renderUseImport();
+
+    await act(async () => {
+      await result.current.import.importFiles(['/test.pdf']);
+    });
+
+    expect(saveBookMetadata).not.toHaveBeenCalled();
   });
 
   it('sets isImporting to false after import completes', async () => {

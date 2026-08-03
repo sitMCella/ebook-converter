@@ -147,6 +147,21 @@ async function getBooksDir() {
   return '';
 }
 
+async function saveBookMetadata(metadata) {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('save_book_metadata', { metadata });
+  }
+}
+
+async function listBooks() {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('list_books');
+  }
+  return [];
+}
+
 async function cancelConversion(path) {
   if (isTauri) {
     const { invoke } = await import('@tauri-apps/api/core');
@@ -173,6 +188,8 @@ export {
   importPdf,
   deleteBook,
   getBooksDir,
+  saveBookMetadata,
+  listBooks,
   convertPdfToEpub,
   cancelConversion,
   onConversionProgress,

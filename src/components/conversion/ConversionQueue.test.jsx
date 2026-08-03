@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { useEffect } from 'react';
+
+vi.mock('../../lib/tauri', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listBooks: vi.fn().mockResolvedValue([]),
+}));
+
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionProvider, useConversionContext } from '../../contexts/ConversionContext';
 import { ConversionQueue } from './ConversionQueue';

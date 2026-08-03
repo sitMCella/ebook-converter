@@ -3,6 +3,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter } from 'react-router-dom';
+
+vi.mock('../../lib/tauri', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listBooks: vi.fn().mockResolvedValue([]),
+}));
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionProvider, useConversionContext } from '../../contexts/ConversionContext';
 import { CompletedList } from './CompletedList';

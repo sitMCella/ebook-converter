@@ -178,7 +178,7 @@ test.describe('Import Screen — File Name Navigation', () => {
     await page.getByRole('button', { name: 'navigate-test.pdf' }).click();
 
     await expect(page).toHaveURL(/\/library/);
-    await expect(page.getByText('Library — coming soon')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
   });
 });
 
