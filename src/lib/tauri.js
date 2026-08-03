@@ -177,6 +177,30 @@ async function onConversionProgress(callback) {
   return () => {};
 }
 
+const SHELL_PLUGIN = '@tauri-apps/' + 'plugin-shell';
+
+async function openFileWithSystem(path) {
+  if (isTauri) {
+    try {
+      const mod = await import(SHELL_PLUGIN);
+      return mod.open(path);
+    } catch {
+      // shell plugin not installed
+    }
+  }
+}
+
+async function openFolder(path) {
+  if (isTauri) {
+    try {
+      const mod = await import(SHELL_PLUGIN);
+      return mod.open(path);
+    } catch {
+      // shell plugin not installed
+    }
+  }
+}
+
 export {
   isTauri,
   openFile,
@@ -193,4 +217,6 @@ export {
   convertPdfToEpub,
   cancelConversion,
   onConversionProgress,
+  openFileWithSystem,
+  openFolder,
 };
