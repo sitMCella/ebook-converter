@@ -86,10 +86,14 @@ pub fn copy_pdf_to_storage(
     })
 }
 
-pub fn get_epub_output_path(app: &tauri::AppHandle, book_id: &str) -> Result<PathBuf, String> {
+pub fn get_epub_output_path(app: &tauri::AppHandle, book_id: &str, pdf_path: &str) -> Result<PathBuf, String> {
     validate_book_id(book_id)?;
     let books_dir = get_books_dir_path(app)?;
-    Ok(books_dir.join(book_id).join("output.epub"))
+    let stem = std::path::Path::new(pdf_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    Ok(books_dir.join(book_id).join(format!("{}.epub", stem)))
 }
 
 pub fn delete_book_dir(app: &tauri::AppHandle, book_id: &str) -> Result<(), String> {

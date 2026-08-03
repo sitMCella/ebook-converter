@@ -107,7 +107,7 @@ pub async fn run_conversion(
     emit_progress(app, &path_owned, "assembling_epub", 80, "Generating EPUB structure...");
 
     let output_path = if let Some(ref book_id) = options.book_id {
-        storage::get_epub_output_path(app, book_id)?
+        storage::get_epub_output_path(app, book_id, path)?
             .to_str()
             .ok_or_else(|| "Invalid output path".to_string())?
             .to_string()
