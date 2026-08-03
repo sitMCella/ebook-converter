@@ -7,6 +7,7 @@ vi.mock('../lib/tauri', () => ({
   convertPdfToEpub: vi.fn(),
   cancelConversion: vi.fn(),
   onConversionProgress: vi.fn(),
+  listBooks: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../lib/settings', () => ({

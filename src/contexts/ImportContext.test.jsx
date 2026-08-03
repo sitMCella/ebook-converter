@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
+
+vi.mock('../lib/tauri', () => ({
+  listBooks: vi.fn(),
+}));
+
 import { ImportProvider, useImportContext } from './ImportContext';
+import { listBooks } from '../lib/tauri';
 
 function renderImportContext() {
   return renderHook(() => useImportContext(), {
@@ -9,6 +15,11 @@ function renderImportContext() {
 }
 
 describe('ImportContext', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    listBooks.mockResolvedValue([]);
+  });
+
   describe('initial state', () => {
     it('starts with empty files and no selections', () => {
       const { result } = renderImportContext();
@@ -393,6 +404,165 @@ describe('ImportContext', () => {
         result.current.dispatch({ type: 'UNKNOWN_ACTION' });
       });
       expect(result.current.state.files.size).toBe(stateBefore.files.size);
+    });
+  });
+
+  describe('LOAD_LIBRARY', () => {
+    it('loads books into the files map', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'LOAD_LIBRARY',
+          books: [
+            {
+              bookId: 'uuid-1',
+              storedPdfPath: '/books/uuid-1/source.pdf',
+              originalPath: '/docs/report.pdf',
+              originalName: 'report.pdf',
+              fileSize: 2048,
+              title: 'Report',
+              author: 'Author',
+              pageCount: 15,
+              pdfVersion: '1.7',
+              createdDate: null,
+              modifiedDate: null,
+              producer: null,
+              status: 'ready',
+            },
+          ],
+        });
+      });
+      expect(result.current.state.files.size).toBe(1);
+      const file = result.current.state.files.get('/docs/report.pdf');
+      expect(file.name).toBe('report.pdf');
+      expect(file.bookId).toBe('uuid-1');
+      expect(file.storedPdfPath).toBe('/books/uuid-1/source.pdf');
+      expect(file.metadata.title).toBe('Report');
+      expect(file.metadata.pageCount).toBe(15);
+    });
+
+    it('does not overwrite existing files', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'ADD_FILES',
+          files: [{ path: '/docs/report.pdf', name: 'report.pdf', status: 'converting' }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'LOAD_LIBRARY',
+          books: [
+            {
+              bookId: 'uuid-1',
+              storedPdfPath: '/books/uuid-1/source.pdf',
+              originalPath: '/docs/report.pdf',
+              originalName: 'report.pdf',
+              fileSize: 2048,
+              title: 'Report',
+              author: null,
+              pageCount: 10,
+              pdfVersion: null,
+              createdDate: null,
+              modifiedDate: null,
+              producer: null,
+              status: 'ready',
+            },
+          ],
+        });
+      });
+      const file = result.current.state.files.get('/docs/report.pdf');
+      expect(file.status).toBe('converting');
+      expect(file.bookId).toBeUndefined();
+    });
+
+    it('loads multiple books', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'LOAD_LIBRARY',
+          books: [
+            {
+              bookId: 'uuid-1',
+              storedPdfPath: '/books/uuid-1/source.pdf',
+              originalPath: '/a.pdf',
+              originalName: 'a.pdf',
+              fileSize: 100,
+              title: null,
+              author: null,
+              pageCount: 1,
+              pdfVersion: null,
+              createdDate: null,
+              modifiedDate: null,
+              producer: null,
+              status: 'ready',
+            },
+            {
+              bookId: 'uuid-2',
+              storedPdfPath: '/books/uuid-2/source.pdf',
+              originalPath: '/b.pdf',
+              originalName: 'b.pdf',
+              fileSize: 200,
+              title: null,
+              author: null,
+              pageCount: 2,
+              pdfVersion: null,
+              createdDate: null,
+              modifiedDate: null,
+              producer: null,
+              status: 'ready',
+            },
+          ],
+        });
+      });
+      expect(result.current.state.files.size).toBe(2);
+    });
+  });
+
+  describe('startup loading', () => {
+    it('loads persisted books on mount', async () => {
+      listBooks.mockResolvedValue([
+        {
+          bookId: 'uuid-startup',
+          storedPdfPath: '/books/uuid-startup/source.pdf',
+          originalPath: '/startup.pdf',
+          originalName: 'startup.pdf',
+          fileSize: 512,
+          title: 'Startup Book',
+          author: null,
+          pageCount: 5,
+          pdfVersion: '1.4',
+          createdDate: null,
+          modifiedDate: null,
+          producer: null,
+          status: 'ready',
+        },
+      ]);
+      const { result } = renderImportContext();
+      await waitFor(() => {
+        expect(result.current.state.files.size).toBe(1);
+      });
+      const file = result.current.state.files.get('/startup.pdf');
+      expect(file.bookId).toBe('uuid-startup');
+      expect(file.metadata.title).toBe('Startup Book');
+    });
+
+    it('handles listBooks failure gracefully', async () => {
+      listBooks.mockRejectedValue(new Error('fail'));
+      const { result } = renderImportContext();
+      await waitFor(() => {
+        expect(listBooks).toHaveBeenCalled();
+      });
+      expect(result.current.state.files.size).toBe(0);
+    });
+
+    it('does not load when listBooks returns empty', async () => {
+      listBooks.mockResolvedValue([]);
+      const { result } = renderImportContext();
+      await waitFor(() => {
+        expect(listBooks).toHaveBeenCalled();
+      });
+      expect(result.current.state.files.size).toBe(0);
     });
   });
 

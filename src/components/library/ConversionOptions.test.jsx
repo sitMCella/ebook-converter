@@ -1,7 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+
+vi.mock('../../lib/tauri', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listBooks: vi.fn().mockResolvedValue([]),
+}));
+
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionOptions } from './ConversionOptions';
 import { useEffect } from 'react';

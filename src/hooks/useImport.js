@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useImportContext } from '../contexts/ImportContext';
-import { validatePdf, getPdfMetadata, getFileSize, importPdf } from '../lib/tauri';
+import { validatePdf, getPdfMetadata, getFileSize, importPdf, saveBookMetadata } from '../lib/tauri';
 
 export function useImport() {
   const { state, dispatch } = useImportContext();
@@ -80,6 +80,25 @@ export function useImport() {
               bookId: stored.bookId,
               storedPdfPath: stored.storedPdfPath,
             });
+
+            if (stored.bookId) {
+              const name = path.split(/[\\/]/).pop();
+              await saveBookMetadata({
+                bookId: stored.bookId,
+                storedPdfPath: stored.storedPdfPath,
+                originalPath: path,
+                originalName: name,
+                fileSize: metadata.fileSize || 0,
+                title: metadata.title || null,
+                author: metadata.author || null,
+                pageCount: metadata.pageCount || 0,
+                pdfVersion: metadata.pdfVersion || null,
+                createdDate: metadata.createdDate || null,
+                modifiedDate: metadata.modifiedDate || null,
+                producer: metadata.producer || null,
+                status: 'ready',
+              });
+            }
 
             dispatch({ type: 'UPDATE_STATUS', path, status: 'ready' });
           } catch (err) {

@@ -21,6 +21,7 @@ vi.mock('../../lib/tauri', async () => {
     cancelConversion: vi.fn(),
     onConversionProgress: vi.fn().mockResolvedValue(() => {}),
     deleteBook: vi.fn().mockResolvedValue(undefined),
+    listBooks: vi.fn().mockResolvedValue([]),
   };
 });
 

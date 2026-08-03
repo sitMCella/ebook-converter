@@ -1,4 +1,5 @@
-import { createContext, useContext, useReducer } from 'react';
+import { createContext, useContext, useReducer, useEffect } from 'react';
+import { listBooks } from '../lib/tauri';
 
 const ImportContext = createContext(null);
 
@@ -118,6 +119,34 @@ function importReducer(state, action) {
       }
       return { ...state, files: newFiles };
     }
+    case 'LOAD_LIBRARY': {
+      const newFiles = new Map(state.files);
+      for (const book of action.books) {
+        const path = book.originalPath;
+        if (!newFiles.has(path)) {
+          newFiles.set(path, {
+            path,
+            name: book.originalName,
+            size: book.fileSize || 0,
+            status: book.status || 'ready',
+            errorMessage: undefined,
+            bookId: book.bookId,
+            storedPdfPath: book.storedPdfPath,
+            metadata: {
+              title: book.title,
+              author: book.author,
+              pageCount: book.pageCount,
+              pdfVersion: book.pdfVersion,
+              createdDate: book.createdDate,
+              modifiedDate: book.modifiedDate,
+              producer: book.producer,
+              fileSize: book.fileSize,
+            },
+          });
+        }
+      }
+      return { ...state, files: newFiles };
+    }
     default:
       return state;
   }
@@ -125,6 +154,17 @@ function importReducer(state, action) {
 
 export function ImportProvider({ children }) {
   const [state, dispatch] = useReducer(importReducer, initialState);
+
+  useEffect(() => {
+    listBooks()
+      .then((books) => {
+        if (books && books.length > 0) {
+          dispatch({ type: 'LOAD_LIBRARY', books });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <ImportContext.Provider value={{ state, dispatch }}>
       {children}

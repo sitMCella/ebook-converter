@@ -21,6 +21,8 @@ pub fn run() {
       storage::import_pdf,
       storage::delete_book,
       storage::get_books_dir,
+      storage::save_book_metadata,
+      storage::list_books,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
