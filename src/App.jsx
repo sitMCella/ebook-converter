@@ -6,6 +6,7 @@ import { AppShell } from './components/layout/AppShell';
 import { ImportScreen } from './components/import/ImportScreen';
 import { ConvertingScreen } from './components/conversion/ConvertingScreen';
 import { LibraryScreen } from './components/library/LibraryScreen';
+import { ConvertedScreen } from './components/converted/ConvertedScreen';
 
 function Placeholder({ title }) {
   return (
@@ -26,7 +27,7 @@ function App() {
               <Route path="import" element={<ImportScreen />} />
               <Route path="converting" element={<ConvertingScreen />} />
               <Route path="library" element={<LibraryScreen />} />
-              <Route path="converted" element={<Placeholder title="Converted" />} />
+              <Route path="converted" element={<ConvertedScreen />} />
               <Route path="settings" element={<Placeholder title="Settings" />} />
             </Route>
           </Routes>

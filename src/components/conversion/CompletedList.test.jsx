@@ -97,7 +97,7 @@ describe('CompletedList', () => {
       </Wrapper>,
     );
     await user.click(screen.getByText('a.pdf'));
-    expect(mockNavigate).toHaveBeenCalledWith('/converted');
+    expect(mockNavigate).toHaveBeenCalledWith('/converted', { state: { selectedPath: '/a.pdf' } });
   });
 
   it('shows status badge for each completed file', () => {
