@@ -119,7 +119,9 @@ No props — reads from ImportContext and React Router.
 
 ### EPUB File Name
 
-Extracted from `file.outputPath`:
+The Rust backend names the EPUB file after the source PDF via `storage::get_epub_output_path`, which derives the stem from the PDF path (e.g., `Design patterns.pdf` → `books/<uuid>/Design patterns.epub`). If the PDF path cannot be parsed, it falls back to `output.epub`.
+
+On the frontend, the display name is extracted from `file.outputPath`:
 
 ```javascript
 function getEpubName(file) {

@@ -57,7 +57,7 @@ Components are co-located in `src/components/converted/`. The screen follows the
 
 ### D7: File Name Derivation
 
-EPUB file names are derived from the `outputPath` on the file object (extracting the basename). If `outputPath` is not available, the source PDF name is used with `.epub` appended.
+The EPUB file on disk is named after the source PDF by the Rust backend: `storage::get_epub_output_path` extracts the PDF file stem and produces `books/<uuid>/<stem>.epub` (e.g., `Design patterns.pdf` → `Design patterns.epub`). On the frontend, EPUB file names are derived from the `outputPath` on the file object (extracting the basename). If `outputPath` is not available, the source PDF name is used with `.epub` appended.
 
 ## Integration Points
 
