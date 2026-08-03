@@ -107,6 +107,17 @@ function importReducer(state, action) {
     case 'DESELECT_ALL': {
       return { ...state, selectedPaths: new Set() };
     }
+    case 'SET_DOCUMENT_OVERRIDES': {
+      const newFiles = new Map(state.files);
+      const file = newFiles.get(action.path);
+      if (file) {
+        newFiles.set(action.path, {
+          ...file,
+          overrides: action.overrides,
+        });
+      }
+      return { ...state, files: newFiles };
+    }
     default:
       return state;
   }

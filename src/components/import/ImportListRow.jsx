@@ -32,7 +32,7 @@ export function ImportListRow({ file, selected, onToggleSelect }) {
           className="flex-1 min-w-0 text-left text-[13px] font-medium truncate hover:underline bg-transparent border-none cursor-pointer p-0 text-[var(--text-primary)]"
           onClick={(e) => {
             e.stopPropagation();
-            navigate('/library');
+            navigate('/library', { state: { selectedPath: file.path } });
           }}
         >
           {file.name}

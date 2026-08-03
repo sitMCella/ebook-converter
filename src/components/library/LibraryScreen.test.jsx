@@ -1,0 +1,212 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
+import { ConversionProvider } from '../../contexts/ConversionContext';
+import { LibraryScreen } from './LibraryScreen';
+import { useEffect } from 'react';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
+const testFiles = [
+  {
+    path: '/docs/design-patterns.pdf',
+    name: 'Design patterns.pdf',
+    size: 13003776,
+    status: 'ready',
+    metadata: {
+      title: 'Design Patterns',
+      author: 'Gamma, Helm, Johnson, Vlissides',
+      pageCount: 384,
+      pdfVersion: '1.7',
+      createdDate: '1994-10-21',
+      modifiedDate: '2004-03-15',
+      producer: 'Adobe Acrobat 6.0',
+      fileSize: 13003776,
+    },
+  },
+  {
+    path: '/docs/clean-architecture.pdf',
+    name: 'Clean architecture.pdf',
+    size: 9123840,
+    status: 'ready',
+    metadata: {
+      title: 'Clean Architecture',
+      author: 'Robert C. Martin',
+      pageCount: 432,
+      pdfVersion: '1.6',
+      createdDate: '2017-09-12',
+      producer: 'LaTeX',
+      fileSize: 9123840,
+    },
+  },
+  {
+    path: '/docs/pragmatic-programmer.pdf',
+    name: 'Pragmatic programmer.pdf',
+    size: 15938355,
+    status: 'converted',
+    metadata: {
+      title: 'The Pragmatic Programmer',
+      author: 'David Thomas, Andrew Hunt',
+      pageCount: 352,
+      pdfVersion: '2.0',
+      createdDate: '2019-09-20',
+      fileSize: 15938355,
+    },
+  },
+];
+
+function SeedFiles({ files, children }) {
+  const { dispatch } = useImportContext();
+  useEffect(() => {
+    dispatch({ type: 'ADD_FILES', files });
+  }, []);
+  return children;
+}
+
+function renderLibrary({ files = testFiles, initialPath = '/library' } = {}) {
+  return render(
+    <ImportProvider>
+      <ConversionProvider>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <SeedFiles files={files}>
+            <LibraryScreen />
+          </SeedFiles>
+        </MemoryRouter>
+      </ConversionProvider>
+    </ImportProvider>,
+  );
+}
+
+describe('LibraryScreen', () => {
+  it('shows empty state when no files are imported', () => {
+    render(
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter>
+            <LibraryScreen />
+          </MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>,
+    );
+    expect(screen.getByText(/your library is empty/i)).toBeInTheDocument();
+    expect(screen.getByText('Go to Import')).toBeInTheDocument();
+  });
+
+  it('navigates to /import when "Go to Import" is clicked', async () => {
+    const user = userEvent.setup();
+    render(
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter>
+            <LibraryScreen />
+          </MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>,
+    );
+    await user.click(screen.getByText('Go to Import'));
+    expect(mockNavigate).toHaveBeenCalledWith('/import');
+  });
+
+  it('renders document list with all imported files', () => {
+    renderLibrary();
+    expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Clean architecture.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Pragmatic programmer.pdf')).toBeInTheDocument();
+  });
+
+  it('renders header with title and search input', () => {
+    renderLibrary();
+    expect(screen.getByText('Library')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search documents...')).toBeInTheDocument();
+  });
+
+  it('auto-selects the first document and shows its metadata', () => {
+    renderLibrary();
+    expect(screen.getByText('Design Patterns')).toBeInTheDocument();
+    expect(screen.getByText('Gamma, Helm, Johnson, Vlissides')).toBeInTheDocument();
+    expect(screen.getByText('384')).toBeInTheDocument();
+  });
+
+  it('switches detail panel when a different document is clicked', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+
+    const listbox = screen.getByRole('listbox');
+    const secondItem = within(listbox).getByText('Clean architecture.pdf');
+    await user.click(secondItem);
+
+    expect(screen.getByText('Clean Architecture')).toBeInTheDocument();
+    expect(screen.getByText('Robert C. Martin')).toBeInTheDocument();
+  });
+
+  it('filters document list by search query', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+
+    const searchInput = screen.getByPlaceholderText('Search documents...');
+    await user.type(searchInput, 'clean');
+
+    expect(screen.queryByText('Design patterns.pdf')).not.toBeInTheDocument();
+    expect(screen.getByText('Clean architecture.pdf')).toBeInTheDocument();
+    expect(screen.queryByText('Pragmatic programmer.pdf')).not.toBeInTheDocument();
+  });
+
+  it('shows "No documents match" when search has no results', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+
+    const searchInput = screen.getByPlaceholderText('Search documents...');
+    await user.type(searchInput, 'nonexistent');
+
+    expect(screen.getByText(/no documents match/i)).toBeInTheDocument();
+  });
+
+  it('shows status badges for each document', () => {
+    renderLibrary();
+    const badges = screen.getAllByText(/Ready|Converted/);
+    expect(badges.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('shows page preview placeholder', () => {
+    renderLibrary();
+    expect(screen.getByText(/page preview not yet available/i)).toBeInTheDocument();
+  });
+
+  it('hides metadata rows when values are absent', () => {
+    renderLibrary({
+      files: [
+        {
+          path: '/docs/no-meta.pdf',
+          name: 'no-meta.pdf',
+          size: 1024,
+          status: 'ready',
+          metadata: { pageCount: 10, pdfVersion: '1.4', fileSize: 1024 },
+        },
+      ],
+    });
+    expect(screen.queryByText('Title')).not.toBeInTheDocument();
+    expect(screen.queryByText('Authors')).not.toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
+  });
+
+  it('shows "Convert to EPUB" button for ready documents', () => {
+    renderLibrary();
+    expect(screen.getByText('Convert to EPUB')).toBeInTheDocument();
+  });
+
+  it('shows "Reconvert to EPUB" for converted documents', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+
+    const listbox = screen.getByRole('listbox');
+    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+
+    expect(screen.getByText('Reconvert to EPUB')).toBeInTheDocument();
+  });
+});
