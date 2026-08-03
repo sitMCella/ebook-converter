@@ -9,7 +9,8 @@
 | File list with metadata | `ImportContext` | All imported PDFs with status, size, and metadata |
 | PDF metadata extraction | `get_pdf_metadata` Rust command | Title, author, page count, PDF version, dates, producer, file size |
 | File validation status | `validate_pdf` Rust command | Valid, encrypted, or error |
-| Managed storage | `storage.rs` | Each book stored at `<app_data>/books/<uuid>/` |
+| Managed storage | `storage.rs` | Each book stored at `<app_data>/books/<uuid>/` with `metadata.json` |
+| Book metadata persistence | `save_book_metadata` / `list_books` commands | Write/read `metadata.json` per book directory |
 | Settings system | `src/lib/settings.js` | `DEFAULT_SETTINGS`, `loadSettings()`, `getEffectiveSettings()`, `mergeSettings()` |
 | Conversion pipeline | `useConversion` hook | Queue management, progress tracking, result handling |
 | UI components | `Button`, `StatusBadge`, `ConfirmDialog`, `Checkbox` | Reusable across screens |
@@ -20,7 +21,7 @@
 | Capability | Impact | Mitigation |
 |---|---|---|
 | PDF page rendering | Cannot show page preview | Show placeholder with file icon and page count |
-| Persistent library state | File list is session-only | State lives in ImportContext; persistence is a future feature |
+| ~~Persistent library state~~ | ~~File list is session-only~~ | Implemented: `metadata.json` saved per book, loaded on startup via `LOAD_LIBRARY` |
 | Settings screen | Global settings cannot be changed via UI | Use `DEFAULT_SETTINGS` as the baseline; settings.js is already wired |
 
 ## Two-Panel Layout Pattern

@@ -2,7 +2,7 @@
 
 ## Architectural Approach
 
-The Library screen is a read-mostly UI that consumes the existing `ImportContext` state. No new context or backend commands are needed — the screen reads from the shared file Map and displays metadata already collected during the import flow.
+The Library screen consumes `ImportContext` state and persists book metadata to disk so the library survives app restarts. Two backend commands (`save_book_metadata`, `list_books`) handle persistence, and the `ImportProvider` loads persisted books on mount.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -25,9 +25,9 @@ The Library screen is a read-mostly UI that consumes the existing `ImportContext
 
 ## Key Decisions
 
-### D1: State Source — ImportContext
+### D1: State Source — ImportContext with Persistence
 
-The Library reads from the same `ImportContext` that the Import screen uses. No separate "library state" is needed since imported files _are_ the library. The file Map already contains metadata, status, and storage info.
+The Library reads from the same `ImportContext` that the Import screen uses. No separate "library state" is needed since imported files _are_ the library. The file Map already contains metadata, status, and storage info. On startup, persisted book metadata is loaded from disk via the `list_books` Rust command and dispatched as a `LOAD_LIBRARY` action.
 
 ### D2: Per-Document Overrides — Stored in ImportContext
 
@@ -59,6 +59,10 @@ The "Convert to EPUB" button uses the existing `useConversion` hook's `startConv
 
 `getEffectiveSettings(globalSettings, file.overrides)` from `src/lib/settings.js` computes the effective settings for conversion. The ConversionOptions component reads global defaults via `loadSettings()` and displays them alongside per-document overrides.
 
+### Storage → Library (Persistence)
+
+The import flow in `useImport.js` calls `saveBookMetadata()` after successfully importing a PDF and extracting its metadata. This writes a `metadata.json` file to the book's storage directory (`<app_data>/books/<uuid>/metadata.json`). On startup, `ImportProvider` calls `listBooks()` in a `useEffect` to load all persisted books into the file Map via the `LOAD_LIBRARY` reducer action. The load is resilient: missing or malformed metadata files are silently skipped.
+
 ## Risk Mitigation
 
 | Risk | Mitigation |
@@ -66,3 +70,5 @@ The "Convert to EPUB" button uses the existing `useConversion` hook's `startConv
 | Large file list performance | Document list uses fixed-height items; metadata display is for the selected file only |
 | Settings screen not yet implemented | ConversionOptions reads defaults from `DEFAULT_SETTINGS`; global settings changes will work automatically once the Settings screen is built |
 | Page preview not available | Clear placeholder UI; no broken functionality |
+| Metadata file corruption | `read_all_book_metadata()` silently skips dirs with missing or malformed `metadata.json` |
+| Startup load race condition | `LOAD_LIBRARY` does not overwrite files already in the Map, so books imported during the current session before the async load completes are preserved |

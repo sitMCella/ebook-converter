@@ -73,6 +73,10 @@ When no files have been imported, the screen shows: "Your library is empty. Impo
 
 Clicking a file name in the Import list navigates to the Library screen with that document pre-selected.
 
+### FR-9: Library Persistence
+
+The library persists across application restarts. When a PDF is imported, its metadata is saved to a `metadata.json` file alongside the stored PDF in `<app_data>/books/<uuid>/`. On application startup, the `ImportProvider` loads all persisted book metadata and populates the file Map, so the Library screen shows previously imported books without re-importing.
+
 ## Non-Functional Requirements
 
 ### NFR-1: Responsive Layout
@@ -93,5 +97,4 @@ The two-panel layout fills the available space. The document list has a fixed wi
 ## Out of Scope
 
 - Page-by-page PDF rendering in the preview area (requires backend command).
-- Persistent library state across app restarts (import list is session-only).
 - Drag-and-drop reordering of the document list.

@@ -13,7 +13,7 @@ The existing file object in the `ImportContext` Map gains an `overrides` field:
 }
 ```
 
-### New Reducer Action
+### New Reducer Actions
 
 ```javascript
 // SET_DOCUMENT_OVERRIDES
@@ -22,7 +22,15 @@ dispatch({
   path: string,            // file path (Map key)
   overrides: object | null, // partial settings, or null to clear all
 })
+
+// LOAD_LIBRARY — bulk-load persisted books on startup
+dispatch({
+  type: 'LOAD_LIBRARY',
+  books: BookMetadata[],   // array from list_books command
+})
 ```
+
+The `LOAD_LIBRARY` action populates the file Map from persisted metadata. It does not overwrite entries that already exist (e.g. files imported during the current session before the async load completes).
 
 ## Per-Document Overrides Shape
 
@@ -128,3 +136,32 @@ Only keys explicitly present in `file.overrides` replace global values. Absent k
   fileSize: number,
 }
 ```
+
+## BookMetadata (persisted, Rust struct)
+
+Stored as `metadata.json` in each book's directory (`<app_data>/books/<uuid>/metadata.json`). Serialized with camelCase field names.
+
+```rust
+pub struct BookMetadata {
+    pub book_id: String,
+    pub stored_pdf_path: String,
+    pub original_path: String,
+    pub original_name: String,
+    pub file_size: u64,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub page_count: u32,
+    pub pdf_version: Option<String>,
+    pub created_date: Option<String>,
+    pub modified_date: Option<String>,
+    pub producer: Option<String>,
+    pub status: String,
+}
+```
+
+## Tauri Bridge Functions (persistence)
+
+| Function | Rust Command | Description |
+|---|---|---|
+| `saveBookMetadata(metadata)` | `save_book_metadata` | Writes `metadata.json` to the book's directory |
+| `listBooks()` | `list_books` | Scans all book directories and returns their metadata |

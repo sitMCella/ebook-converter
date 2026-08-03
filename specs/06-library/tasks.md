@@ -3,9 +3,19 @@
 ## Phase 1: State Changes
 
 ### T1: Add Per-Document Overrides to ImportContext
-- [ ] Add `SET_DOCUMENT_OVERRIDES` action to the import reducer
-- [ ] Store `overrides` as a partial settings object on the file entry
-- [ ] Verify existing reducer actions are unaffected
+- [x] Add `SET_DOCUMENT_OVERRIDES` action to the import reducer
+- [x] Store `overrides` as a partial settings object on the file entry
+- [x] Verify existing reducer actions are unaffected
+
+### T1b: Add Library Persistence
+- [x] Add `BookMetadata` struct to Rust `storage.rs`
+- [x] Add `save_book_metadata` Rust command (writes `metadata.json` to book dir)
+- [x] Add `list_books` Rust command (scans book dirs for `metadata.json` files)
+- [x] Register new commands in `lib.rs`
+- [x] Add `saveBookMetadata()` and `listBooks()` bridge functions in `tauri.js`
+- [x] Add `LOAD_LIBRARY` reducer action to ImportContext
+- [x] Call `listBooks()` in `ImportProvider` `useEffect` on mount
+- [x] Call `saveBookMetadata()` in `useImport` after successful import
 
 ## Phase 2: Components
 
@@ -48,13 +58,28 @@
 ## Phase 4: Tests
 
 ### T7: Unit Tests
-- [ ] Test LibraryScreen empty state renders correctly
-- [ ] Test LibraryScreen renders document list and detail panel
-- [ ] Test search filtering reduces document list
-- [ ] Test DocumentListItem selected and hover states
-- [ ] Test MetadataSection shows available fields, hides absent ones
-- [ ] Test ConversionOptions collapse/expand and override count
-- [ ] Test convert button states (ready, converting, converted)
+- [x] Test LibraryScreen empty state renders correctly
+- [x] Test LibraryScreen renders document list and detail panel
+- [x] Test search filtering reduces document list
+- [x] Test DocumentListItem selected and hover states
+- [x] Test MetadataSection shows available fields, hides absent ones
+- [x] Test ConversionOptions collapse/expand and override count
+- [x] Test convert button states (ready, converting, converted)
+
+### T7b: Persistence Unit Tests
+- [x] Test `LOAD_LIBRARY` reducer action loads books into file Map
+- [x] Test `LOAD_LIBRARY` does not overwrite existing files
+- [x] Test `LOAD_LIBRARY` loads multiple books
+- [x] Test startup loading populates library on mount
+- [x] Test startup loading handles `listBooks` failure gracefully
+- [x] Test `saveBookMetadata` is called after import
+- [x] Test `saveBookMetadata` is skipped when `bookId` is null
+- [x] Rust: test `write_book_metadata` and `read_all_book_metadata` round-trip
+- [x] Rust: test `read_all_book_metadata` returns empty for nonexistent dir
+- [x] Rust: test `read_all_book_metadata` skips dirs without `metadata.json`
+- [x] Rust: test `read_all_book_metadata` skips invalid JSON
+- [x] Rust: test `write_book_metadata` rejects invalid book IDs
+- [x] Rust: test `read_all_book_metadata` reads multiple books
 
 ### T8: E2E Tests
 - [ ] Test navigating from Import to Library pre-selects the document
@@ -64,11 +89,12 @@
 
 ## Acceptance Criteria
 
-- [ ] `/library` route renders the Library screen (not a placeholder)
-- [ ] All imported PDFs appear in the document list
-- [ ] Clicking a document shows its metadata in the detail panel
-- [ ] Search filters the document list by name in real time
-- [ ] Clicking a file name in the Import list navigates to Library with that file selected
-- [ ] Empty state shown when no files are imported, with a working "Go to Import" link
-- [ ] Per-document conversion overrides can be set and show override count
-- [ ] Convert button starts conversion for the selected document
+- [x] `/library` route renders the Library screen (not a placeholder)
+- [x] All imported PDFs appear in the document list
+- [x] Clicking a document shows its metadata in the detail panel
+- [x] Search filters the document list by name in real time
+- [x] Clicking a file name in the Import list navigates to Library with that file selected
+- [x] Empty state shown when no files are imported, with a working "Go to Import" link
+- [x] Per-document conversion overrides can be set and show override count
+- [x] Convert button starts conversion for the selected document
+- [x] Library persists across app restarts (books loaded from storage on startup)
