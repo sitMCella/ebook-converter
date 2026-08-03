@@ -4,9 +4,24 @@
 
 The Converted screen reads from the existing `ImportContext` state. No new reducer actions are needed.
 
+### Persistence
+
+Converted file data is persisted to disk via `BookMetadata` in the Rust backend. When a conversion completes, `useConversion` calls `saveBookMetadata` to update the book's `metadata.json` with `status: 'converted'` and the conversion result fields (`outputPath`, `chapters`, `images`, `epubFileSize`). On app startup, the `LOAD_LIBRARY` reducer action restores `outputPath` and `conversionResult` from the loaded metadata for books with `status === 'converted'`.
+
+#### BookMetadata — Conversion Fields
+
+The Rust `BookMetadata` struct includes these optional fields for conversion results (backward-compatible via `#[serde(default)]`):
+
+```rust
+pub output_path: Option<String>,
+pub chapters: Option<usize>,
+pub images: Option<usize>,
+pub epub_file_size: Option<u64>,
+```
+
 ### Converted File Shape
 
-Files with `status === 'converted'` have the following fields (set by `SET_CONVERSION_RESULT` action in spec 04):
+Files with `status === 'converted'` have the following fields (set by `SET_CONVERSION_RESULT` action in spec 04, and restored from disk by `LOAD_LIBRARY` on startup):
 
 ```javascript
 {

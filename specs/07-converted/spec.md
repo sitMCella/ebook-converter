@@ -6,7 +6,7 @@ Provide a dedicated screen for browsing, inspecting, and managing converted EPUB
 
 ## Background
 
-The conversion pipeline (spec 04) produces EPUB files from imported PDFs. Once conversion completes, the file's status changes to `converted` and a `conversionResult` object is stored on the file entry in `ImportContext` (containing `outputPath`, `chapters`, `images`, `fileSize`). The Converting screen (spec 04) already links completed files to `/converted`, but that route currently renders a placeholder. This spec replaces the placeholder with a full Converted screen following the UI/UX design spec (Screen 4).
+The conversion pipeline (spec 04) produces EPUB files from imported PDFs. Once conversion completes, the file's status changes to `converted` and a `conversionResult` object is stored on the file entry in `ImportContext` (containing `outputPath`, `chapters`, `images`, `fileSize`). The conversion result is also persisted to the book's `metadata.json` on disk so that converted files survive app restarts. On startup, `LOAD_LIBRARY` restores the conversion result data for books with `status === 'converted'`. The Converting screen (spec 04) already links completed files to `/converted`, but that route currently renders a placeholder. This spec replaces the placeholder with a full Converted screen following the UI/UX design spec (Screen 4).
 
 The Converted screen mirrors the Library screen (spec 06) layout — a two-panel master-detail view — but shows EPUB-specific information instead of PDF source metadata.
 
@@ -63,11 +63,15 @@ The header contains a "Open folder" secondary button with a `FolderOpen` icon. O
 
 When no files have been converted, the screen shows: "No converted files yet. Import and convert a PDF to see it here." with a "Go to Import" button that navigates to `/import`.
 
-### FR-9: Navigation from Converting Screen
+### FR-9: Persistence Across Restarts
+
+Converted EPUB data persists across app restarts. When conversion completes, `useConversion` updates the book's `metadata.json` via `saveBookMetadata` with `status: 'converted'` and the conversion result fields (`outputPath`, `chapters`, `images`, `epubFileSize`). On startup, `listBooks()` loads these metadata files and the `LOAD_LIBRARY` reducer restores `outputPath` and `conversionResult` on the file entry, so the Converted screen displays previously converted files without requiring reconversion.
+
+### FR-10: Navigation from Converting Screen
 
 Clicking a completed row in the Converting screen navigates to `/converted` with the EPUB pre-selected via React Router location state (`{ selectedPath }`).
 
-### FR-10: Navigation from Sidebar
+### FR-11: Navigation from Sidebar
 
 The "Converted" sidebar item navigates to `/converted`. The active state styling matches other sidebar items (accent background, font-weight 500).
 
