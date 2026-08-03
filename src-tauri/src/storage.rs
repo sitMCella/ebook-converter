@@ -68,7 +68,11 @@ pub fn copy_pdf_to_storage(
     source_path: &str,
 ) -> Result<StoredBook, String> {
     let (book_id, book_dir) = create_book_dir(app)?;
-    let dest = book_dir.join("source.pdf");
+    let filename = std::path::Path::new(source_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("source.pdf");
+    let dest = book_dir.join(filename);
 
     if let Err(e) = std::fs::copy(source_path, &dest) {
         let _ = std::fs::remove_dir_all(&book_dir);

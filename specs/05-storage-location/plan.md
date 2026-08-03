@@ -48,9 +48,9 @@ Book directories are named with UUID v4 strings (e.g., `550e8400-e29b-41d4-a716-
 
 The human-readable name comes from PDF metadata, not the directory name.
 
-### D2: Fixed Filenames Inside Book Directories
+### D2: Original Filenames Inside Book Directories
 
-Each book directory uses fixed names: `source.pdf` for the imported file and `output.epub` for the converted output. This simplifies path resolution and avoids the collision-avoidance numbering logic currently in `resolve_output_path`.
+Each book directory preserves the original filename for both the imported PDF and the converted EPUB. `copy_pdf_to_storage` extracts the filename from the source path (e.g., `Design patterns.pdf`). `get_epub_output_path` derives the EPUB name from the PDF path by replacing the extension (e.g., `Design patterns.epub`). Since each book has its own UUID directory, there are no name collisions regardless of the filename.
 
 ### D3: Copy in Rust, Not Frontend
 

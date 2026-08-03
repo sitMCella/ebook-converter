@@ -48,13 +48,13 @@ books/
 ```
 books/
   <uuid-1>/
-    source.pdf
-    output.epub
+    Design patterns.pdf
+    Design patterns.epub
   <uuid-2>/
-    source.pdf
+    My report.pdf
 ```
 
-**Pros**: Clean lifecycle management. Extensible (add metadata.json, cover.jpg, conversion.log later). Single `remove_dir_all` for deletion. No name collision possible.
+**Pros**: Clean lifecycle management. Extensible (add metadata.json, cover.jpg, conversion.log later). Single `remove_dir_all` for deletion. No name collision possible. Original filenames preserved for readability.
 **Cons**: More directories to manage. Opaque names when browsing manually.
 
 #### Option C: Human-Readable Directory Names
@@ -124,7 +124,11 @@ If the copy fails (disk full, permission denied, source vanished), the freshly c
 ```rust
 async fn import_pdf(app: tauri::AppHandle, source_path: String) -> Result<StoredBook, String> {
     let (book_id, book_dir) = create_book_dir(&app)?;
-    let dest = book_dir.join("source.pdf");
+    let filename = std::path::Path::new(&source_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("source.pdf");
+    let dest = book_dir.join(filename);
 
     if let Err(e) = std::fs::copy(&source_path, &dest) {
         let _ = std::fs::remove_dir_all(&book_dir);
@@ -142,7 +146,7 @@ async fn import_pdf(app: tauri::AppHandle, source_path: String) -> Result<Stored
 
 ### Conversion Pipeline
 
-The `resolve_output_path` function in `pipeline.rs` currently derives the EPUB filename from the PDF stem and handles collisions with numbering (`file (1).epub`). With per-book directories, this logic is bypassed — the output is always `output.epub` in the book directory. The existing function is retained for backward compatibility but is only used when `book_id` is `None`.
+The `resolve_output_path` function in `pipeline.rs` currently derives the EPUB filename from the PDF stem and handles collisions with numbering (`file (1).epub`). With per-book directories, this logic is bypassed — the output is `<stem>.epub` in the book directory (e.g., `Design patterns.epub`), derived from the PDF path by `get_epub_output_path`. The existing `resolve_output_path` function is retained for backward compatibility but is only used when `book_id` is `None`.
 
 ### Settings
 
