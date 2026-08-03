@@ -2,7 +2,7 @@
 
 ## Architectural Approach
 
-The Converted screen consumes `ImportContext` state, filtering for files with status `converted`. It mirrors the Library screen's master-detail layout. No new backend commands are required for the initial listing — all data is already in the file Map from the conversion pipeline. Two new Tauri bridge functions are needed for the action buttons: opening a file with the system default app and opening a folder in the file manager.
+The Converted screen consumes `ImportContext` state, filtering for files with status `converted`. It mirrors the Library screen's master-detail layout. Conversion results are persisted to the book's `metadata.json` on disk (via extended `BookMetadata` fields) so that converted files survive app restarts. Two new Tauri bridge functions are needed for the action buttons: opening a file with the system default app and opening a folder in the file manager.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -25,9 +25,11 @@ The Converted screen consumes `ImportContext` state, filtering for files with st
 
 ## Key Decisions
 
-### D1: State Source — ImportContext (Filtered)
+### D1: State Source — ImportContext (Filtered) with Disk Persistence
 
 The Converted screen reads from the same `ImportContext` that Import and Library use. Converted files are identified by `status === 'converted'` and have `outputPath` and `conversionResult` fields. No separate "converted state" is needed.
+
+Conversion results are persisted to disk: after a successful conversion, `useConversion` calls `saveBookMetadata` to write the `'converted'` status along with `outputPath`, `chapters`, `images`, and `epubFileSize` to the book's `metadata.json`. On startup, the `LOAD_LIBRARY` reducer restores these fields from the loaded `BookMetadata`, ensuring converted files appear after restart. The Rust `BookMetadata` struct uses `#[serde(default)]` on the new optional fields for backward compatibility with older metadata files.
 
 ### D2: Selection — Component State
 
@@ -55,7 +57,7 @@ Components are co-located in `src/components/converted/`. The screen follows the
 
 ### D7: File Name Derivation
 
-EPUB file names are derived from the `outputPath` on the file object (extracting the basename). If `outputPath` is not available, the source PDF name is used with `.epub` appended.
+The EPUB file on disk is named after the source PDF by the Rust backend: `storage::get_epub_output_path` extracts the PDF file stem and produces `books/<uuid>/<stem>.epub` (e.g., `Design patterns.pdf` → `Design patterns.epub`). On the frontend, EPUB file names are derived from the `outputPath` on the file object (extracting the basename). If `outputPath` is not available, the source PDF name is used with `.epub` appended.
 
 ## Integration Points
 
@@ -88,3 +90,5 @@ The Converted metadata section shows "Default" or "N overrides" for the "Setting
 | EPUB preview complexity | Clear placeholder UI with book icon and chapter count; no broken functionality |
 | TOC parsing complexity | Collapsible section with placeholder message; expandable in a future spec |
 | Conversion result data missing | Handle null/undefined `conversionResult` gracefully; show available fields only |
+| Converted files lost on restart | Conversion results persisted to `metadata.json` via `saveBookMetadata`; `LOAD_LIBRARY` restores `outputPath` and `conversionResult` for books with `status === 'converted'` |
+| Old metadata.json without conversion fields | `BookMetadata` uses `#[serde(default)]` on new optional fields; old files deserialize safely with `None` values |

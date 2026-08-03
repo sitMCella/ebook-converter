@@ -6,7 +6,7 @@
 
 | Capability | Source | Notes |
 |---|---|---|
-| Converted file data | `ImportContext` | Files with `status === 'converted'` have `outputPath` and `conversionResult` (chapters, images, fileSize) |
+| Converted file data | `ImportContext` + `BookMetadata` | Files with `status === 'converted'` have `outputPath` and `conversionResult` (chapters, images, fileSize); persisted to `metadata.json` via `saveBookMetadata` and restored on startup by `LOAD_LIBRARY` |
 | PDF source metadata | `ImportContext` file entries | Title, author, page count — carried over from import |
 | Per-document overrides | `ImportContext` file entries | `file.overrides` — shows which settings were customised |
 | File size formatting | `src/lib/format.js` | `formatFileSize()` |
@@ -22,7 +22,7 @@
 |---|---|---|
 | Shell plugin for opening files/folders | Cannot open EPUB in system reader or folder in file manager | Add `openFileWithSystem()` and `openFolder()` bridge functions; no-op in browser mode; install shell plugin when needed |
 | EPUB content parsing | Cannot render chapter preview or extract TOC | Show placeholder UI with book icon and chapter count |
-| Conversion timestamp | Cannot show exact conversion date/time | Omit field initially; add `convertedAt` to `SET_CONVERSION_RESULT` in a future enhancement |
+| Conversion timestamp | Cannot show exact conversion date/time | Omit field initially; add `convertedAt` to `BookMetadata` and `SET_CONVERSION_RESULT` in a future enhancement |
 | EPUB file reading from disk | "Save as" needs to read the EPUB bytes to copy them | Use `readFile` from Tauri fs plugin (already available) |
 
 ## Two-Panel Layout Pattern (Reuse from Library)

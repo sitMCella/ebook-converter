@@ -11,8 +11,8 @@
 - [ ] Implement `get_books_dir(app: &AppHandle) -> Result<PathBuf, String>` — resolves `<app_data_dir>/books/`, creates it if it does not exist
 - [ ] Implement `validate_book_id(book_id: &str) -> Result<(), String>` — validates the string is a valid UUID v4 to prevent path traversal
 - [ ] Implement `create_book_dir(app: &AppHandle) -> Result<(String, PathBuf), String>` — generates a UUID v4, creates `books/<uuid>/`, returns `(uuid, path)`
-- [ ] Implement `copy_pdf_to_storage(app: &AppHandle, source_path: &str) -> Result<StoredBook, String>` — creates a book directory, copies the PDF as `source.pdf`, returns `StoredBook`
-- [ ] Implement `get_epub_output_path(app: &AppHandle, book_id: &str) -> Result<PathBuf, String>` — returns `books/<uuid>/output.epub`
+- [ ] Implement `copy_pdf_to_storage(app: &AppHandle, source_path: &str) -> Result<StoredBook, String>` — creates a book directory, copies the PDF preserving its original filename, returns `StoredBook`
+- [ ] Implement `get_epub_output_path(app: &AppHandle, book_id: &str, pdf_path: &str) -> Result<PathBuf, String>` — returns `books/<uuid>/<stem>.epub` (filename derived from the PDF path)
 - [ ] Implement `delete_book_dir(app: &AppHandle, book_id: &str) -> Result<(), String>` — validates book_id, removes the entire directory
 - [ ] Define the `StoredBook` struct with `book_id` and `stored_pdf_path` fields, serialized as camelCase
 - [ ] Handle cleanup on copy failure: if `std::fs::copy` fails, remove the created directory
@@ -110,8 +110,8 @@
 
 ## Acceptance Criteria
 
-- [ ] Importing a PDF copies it to `<app_data_dir>/books/<uuid>/source.pdf`
-- [ ] Converting a PDF writes the EPUB to `<app_data_dir>/books/<uuid>/output.epub`
+- [ ] Importing a PDF copies it to `<app_data_dir>/books/<uuid>/<original_name>.pdf` (original filename preserved)
+- [ ] Converting a PDF writes the EPUB to `<app_data_dir>/books/<uuid>/<stem>.epub` (filename derived from the PDF)
 - [ ] Removing a file from the import list deletes the book directory
 - [ ] The Settings screen no longer shows "Output location"
 - [ ] The "Open folder" button on the Converted screen opens the `books/` directory

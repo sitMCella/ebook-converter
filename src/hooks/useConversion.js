@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useConversionContext } from '../contexts/ConversionContext';
 import { useImportContext } from '../contexts/ImportContext';
-import { convertPdfToEpub, cancelConversion, onConversionProgress } from '../lib/tauri';
+import { convertPdfToEpub, cancelConversion, onConversionProgress, saveBookMetadata } from '../lib/tauri';
 import { loadSettings, settingsToConversionOptions } from '../lib/settings';
 
 export function useConversion() {
@@ -59,6 +59,32 @@ export function useConversion() {
           outputPath: result.outputPath,
           result,
         });
+
+        if (bookId) {
+          try {
+            await saveBookMetadata({
+              bookId: file.bookId,
+              storedPdfPath: file.storedPdfPath,
+              originalPath: path,
+              originalName: file.name,
+              fileSize: file.metadata?.fileSize || file.size || 0,
+              title: file.metadata?.title || null,
+              author: file.metadata?.author || null,
+              pageCount: file.metadata?.pageCount || 0,
+              pdfVersion: file.metadata?.pdfVersion || null,
+              createdDate: file.metadata?.createdDate || null,
+              modifiedDate: file.metadata?.modifiedDate || null,
+              producer: file.metadata?.producer || null,
+              status: 'converted',
+              outputPath: result.outputPath,
+              chapters: result.chapters,
+              images: result.images,
+              epubFileSize: result.fileSize,
+            });
+          } catch {
+            // metadata persistence is best-effort
+          }
+        }
 
         conversionDispatch({ type: 'COMPLETE_ACTIVE', path });
       } catch (error) {

@@ -26,6 +26,14 @@ pub struct BookMetadata {
     pub modified_date: Option<String>,
     pub producer: Option<String>,
     pub status: String,
+    #[serde(default)]
+    pub output_path: Option<String>,
+    #[serde(default)]
+    pub chapters: Option<usize>,
+    #[serde(default)]
+    pub images: Option<usize>,
+    #[serde(default)]
+    pub epub_file_size: Option<u64>,
 }
 
 pub fn get_books_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -60,7 +68,11 @@ pub fn copy_pdf_to_storage(
     source_path: &str,
 ) -> Result<StoredBook, String> {
     let (book_id, book_dir) = create_book_dir(app)?;
-    let dest = book_dir.join("source.pdf");
+    let filename = std::path::Path::new(source_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("source.pdf");
+    let dest = book_dir.join(filename);
 
     if let Err(e) = std::fs::copy(source_path, &dest) {
         let _ = std::fs::remove_dir_all(&book_dir);
@@ -78,10 +90,14 @@ pub fn copy_pdf_to_storage(
     })
 }
 
-pub fn get_epub_output_path(app: &tauri::AppHandle, book_id: &str) -> Result<PathBuf, String> {
+pub fn get_epub_output_path(app: &tauri::AppHandle, book_id: &str, pdf_path: &str) -> Result<PathBuf, String> {
     validate_book_id(book_id)?;
     let books_dir = get_books_dir_path(app)?;
-    Ok(books_dir.join(book_id).join("output.epub"))
+    let stem = std::path::Path::new(pdf_path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("output");
+    Ok(books_dir.join(book_id).join(format!("{}.epub", stem)))
 }
 
 pub fn delete_book_dir(app: &tauri::AppHandle, book_id: &str) -> Result<(), String> {
@@ -204,6 +220,10 @@ mod tests {
             modified_date: None,
             producer: None,
             status: "ready".to_string(),
+            output_path: None,
+            chapters: None,
+            images: None,
+            epub_file_size: None,
         }
     }
 

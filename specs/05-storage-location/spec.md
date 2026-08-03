@@ -33,11 +33,10 @@ Each book is stored in its own UUID-named subdirectory under a `books/` folder w
   settings.json               (existing — user settings)
   books/
     <uuid-1>/
-      source.pdf              (copy of the imported PDF)
-      output.epub             (converted EPUB, created on conversion)
+      Design patterns.pdf     (copy of the imported PDF, original name preserved)
+      Design patterns.epub    (converted EPUB, created on conversion)
     <uuid-2>/
-      source.pdf
-      output.epub
+      My report.pdf
     ...
 ```
 
@@ -48,7 +47,7 @@ Per-book subdirectories are chosen over a flat structure for these reasons:
 1. **No name collisions.** Two PDFs named `report.pdf` each get their own UUID directory. No need for collision-avoidance numbering.
 2. **Clean deletion.** Removing a book and all its artifacts is a single `remove_dir_all` call. In a flat structure, tracking which files belong to which book requires additional bookkeeping.
 3. **Extensibility.** Future additions (cover images, conversion logs, multiple output formats, per-book metadata JSON) fit naturally into the per-book directory without polluting a shared namespace.
-4. **Predictable output path.** The conversion pipeline writes to `<book_dir>/output.epub` — no collision detection needed.
+4. **Predictable output path.** The conversion pipeline writes to `<book_dir>/<stem>.epub` — no collision detection needed since each book has its own directory.
 
 **Trade-off**: browsing the storage folder manually shows opaque UUIDs instead of human-readable titles. This is acceptable because users interact through the app UI, not the filesystem.
 
@@ -60,14 +59,14 @@ When a PDF file is imported (via file dialog or drag-and-drop), the application 
 
 1. Generate a new UUID v4 as the book identifier.
 2. Create the directory `<app_data_dir>/books/<uuid>/`.
-3. Copy the source PDF into the directory as `source.pdf`.
+3. Copy the source PDF into the directory, preserving the original filename (e.g., `Design patterns.pdf`).
 4. Return the book ID and stored path to the frontend.
 
 The copy happens in the Rust backend (not via the frontend filesystem plugin) to avoid scope restrictions.
 
 ### FR-2: Store EPUB in Book Directory
 
-When a PDF is converted to EPUB, the output file is written to `<book_dir>/output.epub` instead of the user-configured output folder. The conversion pipeline uses the book ID to resolve the output path.
+When a PDF is converted to EPUB, the output file is written to `<book_dir>/<stem>.epub` (where `<stem>` is the PDF filename without extension, e.g., `Design patterns.pdf` → `Design patterns.epub`) instead of the user-configured output folder. The conversion pipeline uses the book ID and the PDF path to resolve the output path.
 
 ### FR-3: Delete Book from Storage
 

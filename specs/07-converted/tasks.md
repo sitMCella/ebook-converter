@@ -47,14 +47,21 @@
 - [ ] Register plugin in `src-tauri/src/lib.rs`
 - [ ] Add `shell:allow-open` to capabilities
 
-## Phase 3: Wiring
+## Phase 3: Persistence
+
+### T6b: Persist Conversion Results to Disk
+- [x] Add `output_path`, `chapters`, `images`, `epub_file_size` optional fields to Rust `BookMetadata` struct (with `#[serde(default)]` for backward compatibility)
+- [x] Call `saveBookMetadata` in `useConversion` after successful conversion with `status: 'converted'` and result data
+- [x] Restore `outputPath` and `conversionResult` in `LOAD_LIBRARY` reducer for books with `status === 'converted'`
+
+## Phase 4: Wiring
 
 ### T7: Route and Navigation
 - [x] Replace Converted placeholder in `src/App.jsx` with `ConvertedScreen`
 - [x] Update `CompletedList` in Converting screen to pass file path via route state when navigating to `/converted`
 - [x] Verify sidebar "Converted" link activates the correct route
 
-## Phase 4: Tests
+## Phase 5: Tests
 
 ### T8: Unit Tests
 - [x] Test ConvertedScreen empty state renders correctly
@@ -89,3 +96,4 @@
 - [x] "Reconvert" navigates to Library with the source PDF selected
 - [x] EPUB preview shows a placeholder with chapter count
 - [x] Design matches Library screen patterns (spacing, typography, colours)
+- [x] Converted EPUB list persists across app restarts
