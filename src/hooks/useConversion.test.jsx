@@ -36,8 +36,8 @@ function wrapper({ children }) {
   );
 }
 
-function renderUseConversion() {
-  return renderHook(
+async function renderUseConversion() {
+  const result = renderHook(
     () => ({
       conversion: useConversion(),
       importCtx: useImportContext(),
@@ -45,6 +45,8 @@ function renderUseConversion() {
     }),
     { wrapper },
   );
+  await act(async () => {});
+  return result;
 }
 
 describe('useConversion', () => {
@@ -61,13 +63,13 @@ describe('useConversion', () => {
     convertPdfToEpub.mockResolvedValue({ outputPath: '/out/test.epub' });
   });
 
-  it('sets up progress listener on mount', () => {
-    renderUseConversion();
+  it('sets up progress listener on mount', async () => {
+    await renderUseConversion();
     expect(onConversionProgress).toHaveBeenCalledWith(expect.any(Function));
   });
 
   it('does nothing when startConversion is called with empty paths', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.conversion.startConversion([]);
@@ -77,7 +79,7 @@ describe('useConversion', () => {
   });
 
   it('does nothing when startConversion is called with null', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.conversion.startConversion(null);
@@ -87,7 +89,7 @@ describe('useConversion', () => {
   });
 
   it('enqueues files and sets status to converting', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -106,7 +108,7 @@ describe('useConversion', () => {
   });
 
   it('uses same settings for all files in a batch', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -130,7 +132,7 @@ describe('useConversion', () => {
   });
 
   it('applies per-document overrides when converting', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -160,7 +162,7 @@ describe('useConversion', () => {
   });
 
   it('uses global settings for files without overrides', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -181,7 +183,7 @@ describe('useConversion', () => {
 
   it('sets error status when conversion fails', async () => {
     convertPdfToEpub.mockRejectedValue(new Error('PDF too large'));
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -201,7 +203,7 @@ describe('useConversion', () => {
 
   it('uses fallback error message when error has no message', async () => {
     convertPdfToEpub.mockRejectedValue(null);
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -221,7 +223,7 @@ describe('useConversion', () => {
 
   it('uses toString when error has no message property', async () => {
     convertPdfToEpub.mockRejectedValue({ toString: () => 'custom error string' });
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -240,7 +242,7 @@ describe('useConversion', () => {
 
   it('stores output path on success', async () => {
     convertPdfToEpub.mockResolvedValue({ outputPath: '/out/result.epub' });
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -258,7 +260,7 @@ describe('useConversion', () => {
   });
 
   it('dispatches progress events to import context', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -287,7 +289,7 @@ describe('useConversion', () => {
   });
 
   it('adds log entries from progress events', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       progressCallback({
@@ -304,7 +306,7 @@ describe('useConversion', () => {
   });
 
   it('logs error-stage progress as error level', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       progressCallback({
@@ -319,7 +321,7 @@ describe('useConversion', () => {
   });
 
   it('cancelAll resets file statuses to ready', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -363,7 +365,7 @@ describe('useConversion', () => {
 
   it('cancelAll calls cancelConversion for active file', async () => {
     cancelConversion.mockResolvedValue(undefined);
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -388,7 +390,7 @@ describe('useConversion', () => {
 
   it('cancelAll handles cancelConversion failure gracefully', async () => {
     cancelConversion.mockRejectedValue(new Error('cancel failed'));
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.conversionCtx.dispatch({
@@ -405,7 +407,7 @@ describe('useConversion', () => {
   });
 
   it('passes bookId to settingsToConversionOptions', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -425,7 +427,7 @@ describe('useConversion', () => {
   });
 
   it('uses storedPdfPath for conversion when available', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -442,7 +444,7 @@ describe('useConversion', () => {
   });
 
   it('falls back to original path when storedPdfPath is absent', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -459,7 +461,7 @@ describe('useConversion', () => {
   });
 
   it('reports isConverting based on activeFile', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     expect(result.current.conversion.isConverting).toBe(false);
 

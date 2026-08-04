@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -30,7 +30,7 @@ function SeedAndRender({ file }) {
   return <ConversionOptions file={file} />;
 }
 
-function renderOptions(fileOverrides = {}) {
+async function renderOptions(fileOverrides = {}) {
   const file = {
     path: '/test/doc.pdf',
     name: 'doc.pdf',
@@ -40,7 +40,7 @@ function renderOptions(fileOverrides = {}) {
     ...fileOverrides,
   };
 
-  return render(
+  const result = render(
     <SettingsProvider>
       <ImportProvider>
         <MemoryRouter>
@@ -49,18 +49,20 @@ function renderOptions(fileOverrides = {}) {
       </ImportProvider>
     </SettingsProvider>,
   );
+  await act(async () => {});
+  return result;
 }
 
 describe('ConversionOptions', () => {
-  it('renders collapsed by default', () => {
-    renderOptions();
+  it('renders collapsed by default', async () => {
+    await renderOptions();
     expect(screen.getByText('Conversion options')).toBeInTheDocument();
     expect(screen.queryByText('Split chapters by')).not.toBeInTheDocument();
   });
 
   it('expands when clicked', async () => {
     const user = userEvent.setup();
-    renderOptions();
+    await renderOptions();
 
     await user.click(screen.getByText('Conversion options'));
 
@@ -71,8 +73,8 @@ describe('ConversionOptions', () => {
     expect(screen.getByText('Page range')).toBeInTheDocument();
   });
 
-  it('shows override count when overrides exist', () => {
-    renderOptions({
+  it('shows override count when overrides exist', async () => {
+    await renderOptions({
       overrides: {
         pageHandling: { splitChaptersBy: 'heading2' },
         output: { baseFontSize: 14 },
@@ -83,7 +85,7 @@ describe('ConversionOptions', () => {
 
   it('collapses back when clicked again', async () => {
     const user = userEvent.setup();
-    renderOptions();
+    await renderOptions();
 
     await user.click(screen.getByText('Conversion options'));
     expect(screen.getByText('Split chapters by')).toBeInTheDocument();

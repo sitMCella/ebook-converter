@@ -22,12 +22,14 @@ vi.mock('sonner', () => ({
   },
 }));
 
-function renderSettingsScreen() {
-  return render(
+async function renderSettingsScreen() {
+  const result = render(
     <SettingsProvider>
       <SettingsScreen />
     </SettingsProvider>,
   );
+  await act(async () => {});
+  return result;
 }
 
 describe('SettingsScreen', () => {
@@ -35,21 +37,21 @@ describe('SettingsScreen', () => {
     vi.clearAllMocks();
   });
 
-  it('renders all four setting groups with correct headings', () => {
-    renderSettingsScreen();
+  it('renders all four setting groups with correct headings', async () => {
+    await renderSettingsScreen();
     expect(screen.getByText('Structure Detection')).toBeInTheDocument();
     expect(screen.getByText('Images')).toBeInTheDocument();
     expect(screen.getByText('Output Format')).toBeInTheDocument();
     expect(screen.getByText('Page Handling')).toBeInTheDocument();
   });
 
-  it('renders the screen title', () => {
-    renderSettingsScreen();
+  it('renders the screen title', async () => {
+    await renderSettingsScreen();
     expect(screen.getByText('Conversion settings')).toBeInTheDocument();
   });
 
-  it('all toggle controls display their default values', () => {
-    renderSettingsScreen();
+  it('all toggle controls display their default values', async () => {
+    await renderSettingsScreen();
     const detectHeadings = screen.getByLabelText('Detect headings');
     expect(detectHeadings).toHaveAttribute('aria-checked', 'true');
 
@@ -70,7 +72,7 @@ describe('SettingsScreen', () => {
   });
 
   it('toggling a switch updates its value', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     const toggle = screen.getByLabelText('Detect headings');
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     await userEvent.click(toggle);
@@ -78,21 +80,21 @@ describe('SettingsScreen', () => {
   });
 
   it('changing a dropdown updates its value', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     const epubSelect = screen.getByDisplayValue('EPUB 3');
     await userEvent.selectOptions(epubSelect, 'epub2');
     expect(epubSelect).toHaveValue('epub2');
   });
 
-  it('changing a number input updates its value', () => {
-    renderSettingsScreen();
+  it('changing a number input updates its value', async () => {
+    await renderSettingsScreen();
     const fontSizeInput = screen.getByDisplayValue('12');
     fireEvent.change(fontSizeInput, { target: { value: '16' } });
     expect(fontSizeInput).toHaveValue(16);
   });
 
   it('"Reset to defaults" button shows confirmation dialog', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     await userEvent.click(screen.getByText('Reset to defaults'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText('Reset all settings to factory defaults? Per-document overrides are not affected.')).toBeInTheDocument();
@@ -100,7 +102,7 @@ describe('SettingsScreen', () => {
 
   it('confirming reset calls resetToDefaults', async () => {
     const { saveSettings } = await import('../../lib/settings');
-    renderSettingsScreen();
+    await renderSettingsScreen();
 
     const toggle = screen.getByLabelText('Detect headings');
     await userEvent.click(toggle);
@@ -113,7 +115,7 @@ describe('SettingsScreen', () => {
   });
 
   it('cancelling reset does not change settings', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
 
     const toggle = screen.getByLabelText('Detect headings');
     await userEvent.click(toggle);
@@ -125,7 +127,7 @@ describe('SettingsScreen', () => {
   });
 
   it('"Custom" page range shows From/To inputs', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     expect(screen.queryByText('From')).not.toBeInTheDocument();
     const pageRangeSelect = screen.getByDisplayValue('All');
     await userEvent.selectOptions(pageRangeSelect, 'custom');
@@ -134,7 +136,7 @@ describe('SettingsScreen', () => {
   });
 
   it('selecting "All" page range hides From/To inputs', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     const pageRangeSelect = screen.getByDisplayValue('All');
     await userEvent.selectOptions(pageRangeSelect, 'custom');
     expect(screen.getByText('From')).toBeInTheDocument();
@@ -143,7 +145,7 @@ describe('SettingsScreen', () => {
   });
 
   it('disabling "Extract images" disables image sub-settings', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     const extractToggle = screen.getByLabelText('Extract images');
     await userEvent.click(extractToggle);
 
@@ -155,7 +157,7 @@ describe('SettingsScreen', () => {
   });
 
   it('enabling "Extract images" re-enables image sub-settings', async () => {
-    renderSettingsScreen();
+    await renderSettingsScreen();
     const extractToggle = screen.getByLabelText('Extract images');
 
     await userEvent.click(extractToggle);
@@ -167,7 +169,7 @@ describe('SettingsScreen', () => {
 
   it('enabling WebP with EPUB 2 selected auto-upgrades to EPUB 3 and shows toast', async () => {
     const { toast } = await import('sonner');
-    renderSettingsScreen();
+    await renderSettingsScreen();
 
     const epubSelect = screen.getByDisplayValue('EPUB 3');
     await userEvent.selectOptions(epubSelect, 'epub2');
@@ -185,7 +187,7 @@ describe('SettingsScreen', () => {
 
   it('switching to EPUB 2 with WebP enabled auto-disables WebP and shows toast', async () => {
     const { toast } = await import('sonner');
-    renderSettingsScreen();
+    await renderSettingsScreen();
 
     const webpToggle = screen.getByLabelText('Convert to WebP');
     await userEvent.click(webpToggle);
@@ -203,7 +205,7 @@ describe('SettingsScreen', () => {
 
   it('disabling detect headings with heading-based split shows advisory toast', async () => {
     const { toast } = await import('sonner');
-    renderSettingsScreen();
+    await renderSettingsScreen();
 
     const headingsToggle = screen.getByLabelText('Detect headings');
     await userEvent.click(headingsToggle);
@@ -216,7 +218,7 @@ describe('SettingsScreen', () => {
 
   it('save indicator appears briefly after changing a setting', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    renderSettingsScreen();
+    await renderSettingsScreen();
 
     const toggle = screen.getByLabelText('Detect headings');
     await userEvent.click(toggle);
@@ -238,23 +240,23 @@ describe('SettingsScreen', () => {
     vi.useRealTimers();
   });
 
-  it('max image width input has correct constraints', () => {
-    renderSettingsScreen();
+  it('max image width input has correct constraints', async () => {
+    await renderSettingsScreen();
     const maxWidthInput = screen.getByDisplayValue('800');
     expect(maxWidthInput).toHaveAttribute('min', '200');
     expect(maxWidthInput).toHaveAttribute('max', '2000');
     expect(maxWidthInput).toHaveAttribute('step', '100');
   });
 
-  it('heading level threshold input has correct constraints', () => {
-    renderSettingsScreen();
+  it('heading level threshold input has correct constraints', async () => {
+    await renderSettingsScreen();
     const thresholdInput = screen.getByDisplayValue('3');
     expect(thresholdInput).toHaveAttribute('min', '1');
     expect(thresholdInput).toHaveAttribute('max', '6');
   });
 
-  it('renders all dropdown options for EPUB version', () => {
-    renderSettingsScreen();
+  it('renders all dropdown options for EPUB version', async () => {
+    await renderSettingsScreen();
     const epubSelect = screen.getByDisplayValue('EPUB 3');
     const options = epubSelect.querySelectorAll('option');
     expect(options).toHaveLength(2);
@@ -262,8 +264,8 @@ describe('SettingsScreen', () => {
     expect(options[1]).toHaveTextContent('EPUB 3');
   });
 
-  it('renders all text alignment options', () => {
-    renderSettingsScreen();
+  it('renders all text alignment options', async () => {
+    await renderSettingsScreen();
     const alignSelect = screen.getByDisplayValue('Justify');
     const options = alignSelect.querySelectorAll('option');
     expect(options).toHaveLength(3);
@@ -272,8 +274,8 @@ describe('SettingsScreen', () => {
     expect(options[2]).toHaveTextContent('Right');
   });
 
-  it('renders all cover page options', () => {
-    renderSettingsScreen();
+  it('renders all cover page options', async () => {
+    await renderSettingsScreen();
     const coverSelect = screen.getByDisplayValue('Auto-detect');
     const options = coverSelect.querySelectorAll('option');
     expect(options).toHaveLength(3);
@@ -282,8 +284,8 @@ describe('SettingsScreen', () => {
     expect(options[2]).toHaveTextContent('None');
   });
 
-  it('renders unit labels for number inputs', () => {
-    renderSettingsScreen();
+  it('renders unit labels for number inputs', async () => {
+    await renderSettingsScreen();
     expect(screen.getByText('px')).toBeInTheDocument();
     expect(screen.getByText('pt')).toBeInTheDocument();
     expect(screen.getByText('em')).toBeInTheDocument();

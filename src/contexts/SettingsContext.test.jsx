@@ -51,12 +51,14 @@ function TestConsumer() {
   );
 }
 
-function renderWithProvider() {
-  return render(
+async function renderWithProvider() {
+  const result = render(
     <SettingsProvider>
       <TestConsumer />
     </SettingsProvider>,
   );
+  await act(async () => {});
+  return result;
 }
 
 describe('SettingsContext', () => {
@@ -64,8 +66,8 @@ describe('SettingsContext', () => {
     vi.clearAllMocks();
   });
 
-  it('initial state is DEFAULT_SETTINGS', () => {
-    renderWithProvider();
+  it('initial state is DEFAULT_SETTINGS', async () => {
+    await renderWithProvider();
     expect(screen.getByTestId('detect-headings')).toHaveTextContent('true');
     expect(screen.getByTestId('epub-version')).toHaveTextContent('epub3');
     expect(screen.getByTestId('text-alignment')).toHaveTextContent('justify');
@@ -73,14 +75,14 @@ describe('SettingsContext', () => {
   });
 
   it('updateSetting updates a value in the correct group', async () => {
-    renderWithProvider();
+    await renderWithProvider();
     await userEvent.click(screen.getByTestId('toggle-headings'));
     expect(screen.getByTestId('detect-headings')).toHaveTextContent('false');
   });
 
   it('WebP + EPUB 2 cross-validation triggers version upgrade', async () => {
     const { toast } = await import('sonner');
-    renderWithProvider();
+    await renderWithProvider();
 
     await act(async () => {
       await userEvent.click(screen.getByTestId('set-epub2'));
@@ -98,7 +100,7 @@ describe('SettingsContext', () => {
 
   it('EPUB 2 + WebP cross-validation disables WebP', async () => {
     const { toast } = await import('sonner');
-    renderWithProvider();
+    await renderWithProvider();
 
     await act(async () => {
       await userEvent.click(screen.getByTestId('enable-webp'));
@@ -116,7 +118,7 @@ describe('SettingsContext', () => {
 
   it('resetToDefaults reverts all settings', async () => {
     const { saveSettings } = await import('../lib/settings');
-    renderWithProvider();
+    await renderWithProvider();
 
     await act(async () => {
       await userEvent.click(screen.getByTestId('toggle-headings'));
@@ -132,7 +134,7 @@ describe('SettingsContext', () => {
 
   it('debounced save is called after updateSetting', async () => {
     const { saveSettings } = await import('../lib/settings');
-    renderWithProvider();
+    await renderWithProvider();
 
     await act(async () => {
       await userEvent.click(screen.getByTestId('toggle-headings'));
@@ -146,7 +148,7 @@ describe('SettingsContext', () => {
 
   it('disabling detect headings with heading-based split emits advisory warning', async () => {
     const { toast } = await import('sonner');
-    renderWithProvider();
+    await renderWithProvider();
 
     expect(screen.getByTestId('split-chapters')).toHaveTextContent('heading1');
 
@@ -161,7 +163,7 @@ describe('SettingsContext', () => {
 
   it('disabling detect headings with heading2 split also emits advisory warning', async () => {
     const { toast } = await import('sonner');
-    renderWithProvider();
+    await renderWithProvider();
 
     await act(async () => {
       await userEvent.click(screen.getByTestId('set-split-heading2'));
@@ -177,7 +179,7 @@ describe('SettingsContext', () => {
   });
 
   it('heading detection warning is advisory only — does not change splitChaptersBy', async () => {
-    renderWithProvider();
+    await renderWithProvider();
 
     await act(async () => {
       await userEvent.click(screen.getByTestId('toggle-headings'));
@@ -208,6 +210,7 @@ describe('SettingsContext', () => {
         <FontConsumer />
       </SettingsProvider>,
     );
+    await act(async () => {});
 
     await waitFor(() => {
       expect(screen.getByTestId('is-loaded')).toHaveTextContent('true');
