@@ -71,6 +71,28 @@ This starts the Vite dev server and opens a Tauri window pointing at it. Edits t
 
 The first run compiles the Rust backend, which takes 1-2 minutes. Subsequent runs start in seconds.
 
+### Clearing the Cache
+
+To clear the Tauri WebView cache (e.g. after frontend changes aren't reflected):
+
+**macOS:**
+```bash
+rm -rf ~/Library/WebKit/ebook-converter
+rm -rf ~/Library/Caches/ebook-converter
+```
+
+**Linux:**
+```bash
+rm -rf ~/.local/share/ebook-converter
+rm -rf ~/.cache/ebook-converter
+```
+
+**Windows (PowerShell):**
+```powershell
+Remove-Item -Recurse -Force "$env:APPDATA\ebook-converter"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\ebook-converter"
+```
+
 ### Browser Only (Vite)
 
 To work on the frontend without building the Rust backend:
