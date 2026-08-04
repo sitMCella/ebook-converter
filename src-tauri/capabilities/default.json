@@ -13,7 +13,6 @@
     "fs:allow-write-file",
     "fs:allow-stat",
     "fs:allow-mkdir",
-    "fs:allow-exists",
-    "shell:allow-open"
+    "fs:allow-exists"
   ]
 }
