@@ -1,4 +1,3 @@
-import { StatusBadge } from '../import/StatusBadge';
 import { formatFileSize } from '../../lib/format';
 
 export function DocumentListItem({ file, selected, onSelect }) {
@@ -16,12 +15,9 @@ export function DocumentListItem({ file, selected, onSelect }) {
           : 'hover:bg-[var(--surface-2)]'
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] truncate text-[var(--text-primary)]">
-          {file.name}
-        </span>
-        <StatusBadge status={file.status} />
-      </div>
+      <span className="text-[13px] truncate block text-[var(--text-primary)]">
+        {file.name}
+      </span>
       {fileSize > 0 && (
         <span className="text-[12px] text-[var(--text-muted)] mt-0.5 block">
           {formatFileSize(fileSize)}

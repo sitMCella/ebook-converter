@@ -189,12 +189,6 @@ describe('LibraryScreen', () => {
     expect(screen.getByText(/no documents match/i)).toBeInTheDocument();
   });
 
-  it('shows status badges for each document', () => {
-    renderLibrary();
-    const badges = screen.getAllByText(/Ready|Converted/);
-    expect(badges.length).toBeGreaterThanOrEqual(3);
-  });
-
   it('shows page preview placeholder', () => {
     renderLibrary();
     expect(screen.getByText(/page preview not yet available/i)).toBeInTheDocument();
