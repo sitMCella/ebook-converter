@@ -17,13 +17,14 @@ vi.mock('../lib/settings', async () => {
     ...actual,
     loadSettings: vi.fn().mockResolvedValue({ ...actual.DEFAULT_SETTINGS }),
     saveSettings: vi.fn().mockResolvedValue(undefined),
+    getEffectiveSettings: vi.fn((base, overrides) => actual.getEffectiveSettings(base, overrides)),
     settingsToConversionOptions: vi.fn(),
   };
 });
 
 import { useConversion } from './useConversion';
 import { convertPdfToEpub, cancelConversion, onConversionProgress } from '../lib/tauri';
-import { settingsToConversionOptions } from '../lib/settings';
+import { getEffectiveSettings, settingsToConversionOptions } from '../lib/settings';
 
 function wrapper({ children }) {
   return (
@@ -125,7 +126,57 @@ describe('useConversion', () => {
     expect(settingsToConversionOptions).toHaveBeenCalledTimes(2);
     const firstCallSettings = settingsToConversionOptions.mock.calls[0][0];
     const secondCallSettings = settingsToConversionOptions.mock.calls[1][0];
-    expect(firstCallSettings).toBe(secondCallSettings);
+    expect(firstCallSettings).toEqual(secondCallSettings);
+  });
+
+  it('applies per-document overrides when converting', async () => {
+    const { result } = renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'SET_DOCUMENT_OVERRIDES',
+        path: '/a.pdf',
+        overrides: { images: { imageQuality: 'high' } },
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(getEffectiveSettings).toHaveBeenCalledWith(
+      expect.anything(),
+      { images: { imageQuality: 'high' } },
+    );
+    const mergedSettings = settingsToConversionOptions.mock.calls[0][0];
+    expect(mergedSettings.images.imageQuality).toBe('high');
+  });
+
+  it('uses global settings for files without overrides', async () => {
+    const { result } = renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(getEffectiveSettings).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+    );
   });
 
   it('sets error status when conversion fails', async () => {
