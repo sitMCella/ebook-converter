@@ -9,14 +9,14 @@ import { BatchActions } from './BatchActions';
 import { Button } from '../ui/Button';
 
 export function ImportScreen() {
-  const { importFiles } = useImport();
+  const { stageFiles } = useImport();
 
   const handleBrowse = useCallback(async () => {
     const paths = await openPdfFiles();
-    if (paths) importFiles(paths);
-  }, [importFiles]);
+    if (paths) stageFiles(paths);
+  }, [stageFiles]);
 
-  useDragDrop(importFiles);
+  useDragDrop(stageFiles);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -39,7 +39,7 @@ export function ImportScreen() {
         </Button>
       </div>
 
-      <DropZone onFilesSelected={importFiles} />
+      <DropZone onFilesSelected={stageFiles} />
 
       <div className="mt-6">
         <ImportList />

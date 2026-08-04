@@ -86,7 +86,7 @@ The Converted metadata section shows "Default" or "N overrides" for the "Setting
 | Risk | Mitigation |
 |------|-----------|
 | No converted files to show during development | Use the existing conversion pipeline to produce test files; unit tests seed converted file entries via dispatch |
-| Shell plugin not yet installed | `openFileWithSystem` and `openFolder` return no-op in browser mode; feature degrades gracefully |
+| Shell plugin unavailable | Shell plugin is installed (`@tauri-apps/plugin-shell` npm, `tauri-plugin-shell` Cargo, registered in `lib.rs`, `shell:allow-open` capability granted); in browser mode, functions are no-ops |
 | EPUB preview complexity | Clear placeholder UI with book icon and chapter count; no broken functionality |
 | TOC parsing complexity | Collapsible section with placeholder message; expandable in a future spec |
 | Conversion result data missing | Handle null/undefined `conversionResult` gracefully; show available fields only |

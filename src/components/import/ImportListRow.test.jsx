@@ -1,14 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { ImportListRow } from './ImportListRow';
-
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return { ...actual, useNavigate: () => mockNavigate };
-});
 
 describe('ImportListRow', () => {
   const baseFile = {
@@ -23,16 +16,15 @@ describe('ImportListRow', () => {
     const onToggle = vi.fn();
     const file = { ...baseFile, ...fileOverrides };
     const result = render(
-      <MemoryRouter>
-        <ImportListRow file={file} selected={selected} onToggleSelect={onToggle} />
-      </MemoryRouter>
+      <ImportListRow file={file} selected={selected} onToggleSelect={onToggle} />
     );
     return { ...result, onToggle };
   }
 
-  it('renders file name', () => {
+  it('renders file name as plain text', () => {
     renderRow();
     expect(screen.getByText('document.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'document.pdf' })).not.toBeInTheDocument();
   });
 
   it('renders file size from metadata', () => {
@@ -66,13 +58,6 @@ describe('ImportListRow', () => {
     expect(screen.getByText('File corrupted')).toBeInTheDocument();
     await user.click(row);
     expect(screen.queryByText('File corrupted')).not.toBeInTheDocument();
-  });
-
-  it('navigates to /library when file name is clicked', async () => {
-    const user = userEvent.setup();
-    renderRow();
-    await user.click(screen.getByText('document.pdf'));
-    expect(mockNavigate).toHaveBeenCalledWith('/library', { state: { selectedPath: '/test/document.pdf' } });
   });
 
   it('renders checkbox with selection state', () => {

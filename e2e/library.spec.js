@@ -8,7 +8,7 @@ function createFakeFile(name) {
   };
 }
 
-async function importFile(page, fileName) {
+async function stageFile(page, fileName) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -16,7 +16,7 @@ async function importFile(page, fileName) {
   await expect(page.getByText(fileName)).toBeVisible();
 }
 
-async function importFiles(page, fileNames) {
+async function stageFiles(page, fileNames) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -26,13 +26,22 @@ async function importFiles(page, fileNames) {
   }
 }
 
-async function importAndNavigateToLibrary(page, fileNames) {
+async function importAllStagedToLibrary(page) {
+  for (const checkbox of await page.getByRole('checkbox').all()) {
+    await checkbox.check();
+  }
+  await page.getByRole('button', { name: /import to library/i }).click();
+  await expect(page.getByText('No files staged yet.')).toBeVisible();
+}
+
+async function stageAndImportToLibrary(page, fileNames) {
   await page.goto('/import');
   if (Array.isArray(fileNames)) {
-    await importFiles(page, fileNames);
+    await stageFiles(page, fileNames);
   } else {
-    await importFile(page, fileNames);
+    await stageFile(page, fileNames);
   }
+  await importAllStagedToLibrary(page);
   await page.locator('nav').getByText('Library').click();
   await expect(page).toHaveURL(/\/library/);
 }
@@ -61,7 +70,7 @@ test.describe('Library Screen — Empty State', () => {
 
 test.describe('Library Screen — Layout', () => {
   test.beforeEach(async ({ page }) => {
-    await importAndNavigateToLibrary(page, ['alpha.pdf', 'beta.pdf']);
+    await stageAndImportToLibrary(page, ['alpha.pdf', 'beta.pdf']);
   });
 
   test('shows the Library heading', async ({ page }) => {
@@ -94,7 +103,7 @@ test.describe('Library Screen — Layout', () => {
 
 test.describe('Library Screen — Document Selection', () => {
   test.beforeEach(async ({ page }) => {
-    await importAndNavigateToLibrary(page, ['doc-one.pdf', 'doc-two.pdf']);
+    await stageAndImportToLibrary(page, ['doc-one.pdf', 'doc-two.pdf']);
   });
 
   test('clicking a document selects it and deselects others', async ({ page }) => {
@@ -118,7 +127,7 @@ test.describe('Library Screen — Document Selection', () => {
 
 test.describe('Library Screen — Search', () => {
   test.beforeEach(async ({ page }) => {
-    await importAndNavigateToLibrary(page, ['report-2024.pdf', 'invoice-jan.pdf', 'report-2025.pdf']);
+    await stageAndImportToLibrary(page, ['report-2024.pdf', 'invoice-jan.pdf', 'report-2025.pdf']);
   });
 
   test('filters documents by search query', async ({ page }) => {
@@ -168,7 +177,7 @@ test.describe('Library Screen — Search', () => {
 
 test.describe('Library Screen — Detail Panel', () => {
   test.beforeEach(async ({ page }) => {
-    await importAndNavigateToLibrary(page, 'details-test.pdf');
+    await stageAndImportToLibrary(page, 'details-test.pdf');
   });
 
   test('shows page preview placeholder', async ({ page }) => {
@@ -198,7 +207,7 @@ test.describe('Library Screen — Detail Panel', () => {
 
 test.describe('Library Screen — Conversion Options', () => {
   test.beforeEach(async ({ page }) => {
-    await importAndNavigateToLibrary(page, 'options-test.pdf');
+    await stageAndImportToLibrary(page, 'options-test.pdf');
   });
 
   test('conversion options section is collapsed by default', async ({ page }) => {
@@ -244,26 +253,11 @@ test.describe('Library Screen — Conversion Options', () => {
   });
 });
 
-// --- Navigation from Import ---
-
-test.describe('Library Screen — Navigation from Import', () => {
-  test('clicking file name in import screen navigates to library with file selected', async ({ page }) => {
-    await page.goto('/import');
-    await importFiles(page, ['nav-first.pdf', 'nav-second.pdf']);
-
-    await page.getByRole('button', { name: 'nav-second.pdf' }).click();
-
-    await expect(page).toHaveURL(/\/library/);
-    const selectedOption = page.getByRole('option').filter({ hasText: 'nav-second.pdf' });
-    await expect(selectedOption).toHaveAttribute('aria-selected', 'true');
-  });
-});
-
 // --- State Persistence across Navigation ---
 
 test.describe('Library Screen — State Persistence', () => {
   test('files persist when navigating away and back', async ({ page }) => {
-    await importAndNavigateToLibrary(page, ['persist-a.pdf', 'persist-b.pdf']);
+    await stageAndImportToLibrary(page, ['persist-a.pdf', 'persist-b.pdf']);
 
     await page.locator('nav').getByText('Import').click();
     await expect(page).toHaveURL(/\/import/);
@@ -277,7 +271,7 @@ test.describe('Library Screen — State Persistence', () => {
   });
 
   test('search query resets when navigating away and back', async ({ page }) => {
-    await importAndNavigateToLibrary(page, ['reset-a.pdf', 'reset-b.pdf']);
+    await stageAndImportToLibrary(page, ['reset-a.pdf', 'reset-b.pdf']);
 
     await page.getByRole('textbox', { name: /search documents/i }).fill('reset-a');
     await expect(page.getByRole('listbox').getByText('reset-b.pdf')).not.toBeVisible();

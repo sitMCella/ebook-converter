@@ -8,7 +8,7 @@ function createFakeFile(name) {
   };
 }
 
-async function importFile(page, fileName) {
+async function stageFile(page, fileName) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -16,7 +16,7 @@ async function importFile(page, fileName) {
   await expect(page.getByText(fileName)).toBeVisible();
 }
 
-async function importFiles(page, fileNames) {
+async function stageFiles(page, fileNames) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -26,11 +26,47 @@ async function importFiles(page, fileNames) {
   }
 }
 
-async function selectAndConvert(page, fileNames) {
-  for (const name of fileNames) {
-    await page.getByRole('checkbox', { name: new RegExp(`select ${name}`, 'i') }).click();
+async function importAllStagedToLibrary(page) {
+  for (const checkbox of await page.getByRole('checkbox').all()) {
+    await checkbox.check();
   }
-  await page.getByRole('button', { name: /convert selected/i }).click();
+  await page.getByRole('button', { name: /import to library/i }).click();
+  await expect(page.getByText('No files staged yet.')).toBeVisible();
+}
+
+async function convertFromLibrary(page, fileNames) {
+  const names = Array.isArray(fileNames) ? fileNames : [fileNames];
+  if (names.length > 1) {
+    await page.evaluate((paths) => {
+      window.__BATCH_PATHS = paths;
+    }, names);
+  }
+  await page.locator('nav').getByText('Library').click();
+  await page.getByRole('option').filter({ hasText: names[0] }).click();
+  await page.getByRole('button', { name: /convert to epub/i }).click();
+}
+
+async function importAndConvert(page, fileNames) {
+  const names = Array.isArray(fileNames) ? fileNames : [fileNames];
+  if (names.length === 1) {
+    await stageFile(page, names[0]);
+  } else {
+    await stageFiles(page, names);
+  }
+  await importAllStagedToLibrary(page);
+  await convertFromLibrary(page, names);
+}
+
+function setupBatchConversion(page) {
+  return page.route(/\/src\/components\/library\/DetailPanel\.jsx/, async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+    const modified = body.replace(
+      'startConversion([file.path])',
+      'startConversion(window.__BATCH_PATHS || [file.path])',
+    );
+    await route.fulfill({ body: modified, headers: response.headers() });
+  });
 }
 
 function mockHangingConversion(page) {
@@ -90,17 +126,15 @@ test.describe('Single file conversion — error handling', () => {
     await page.goto('/import');
   });
 
-  test('navigates to /converting after clicking Convert selected', async ({
+  test('navigates to /converting after starting conversion', async ({
     page,
   }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
     await expect(page).toHaveURL(/\/converting/);
   });
 
   test('shows error badge when conversion fails', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(page.getByText('Completed')).toBeVisible();
     await expect(
@@ -109,8 +143,7 @@ test.describe('Single file conversion — error handling', () => {
   });
 
   test('shows error message in conversion log', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(
       page.getByText(/Error:.*Conversion requires the desktop app/),
@@ -118,8 +151,7 @@ test.describe('Single file conversion — error handling', () => {
   });
 
   test('shows Conversion complete heading after error', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(
       page.getByRole('heading', { name: 'Conversion complete' }),
@@ -127,8 +159,7 @@ test.describe('Single file conversion — error handling', () => {
   });
 
   test('shows View converted button after completion', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(
       page.getByRole('button', { name: /view converted/i }),
@@ -138,8 +169,7 @@ test.describe('Single file conversion — error handling', () => {
   test('hides Cancel all button after conversion finishes', async ({
     page,
   }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(
       page.getByRole('heading', { name: 'Conversion complete' }),
@@ -150,8 +180,7 @@ test.describe('Single file conversion — error handling', () => {
   });
 
   test('waiting message is replaced by log entries', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(
       page.getByText(/Error:.*Conversion requires the desktop app/),
@@ -166,14 +195,14 @@ test.describe('Single file conversion — error handling', () => {
 
 test.describe('Batch conversion — error handling', () => {
   test.beforeEach(async ({ page }) => {
+    await setupBatchConversion(page);
     await page.goto('/import');
   });
 
   test('all files appear in completed list with error badges', async ({
     page,
   }) => {
-    await importFiles(page, ['report.pdf', 'thesis.pdf', 'manual.pdf']);
-    await selectAndConvert(page, ['report.pdf', 'thesis.pdf', 'manual.pdf']);
+    await importAndConvert(page, ['report.pdf', 'thesis.pdf', 'manual.pdf']);
 
     await expect(page).toHaveURL(/\/converting/);
     await expect(
@@ -186,8 +215,7 @@ test.describe('Batch conversion — error handling', () => {
   });
 
   test('shows an error log entry for each failed file', async ({ page }) => {
-    await importFiles(page, ['file1.pdf', 'file2.pdf', 'file3.pdf']);
-    await selectAndConvert(page, ['file1.pdf', 'file2.pdf', 'file3.pdf']);
+    await importAndConvert(page, ['file1.pdf', 'file2.pdf', 'file3.pdf']);
 
     await expect(
       page.getByRole('heading', { name: 'Conversion complete' }),
@@ -200,8 +228,7 @@ test.describe('Batch conversion — error handling', () => {
   });
 
   test('file names appear in completed list', async ({ page }) => {
-    await importFiles(page, ['alpha.pdf', 'beta.pdf']);
-    await selectAndConvert(page, ['alpha.pdf', 'beta.pdf']);
+    await importAndConvert(page, ['alpha.pdf', 'beta.pdf']);
 
     await expect(page.getByText('Completed')).toBeVisible();
     const completedSection = page.locator('text=Completed >> ..');
@@ -214,6 +241,7 @@ test.describe('Batch conversion — error handling', () => {
 
 test.describe('Cancellation', () => {
   test.beforeEach(async ({ page }) => {
+    await setupBatchConversion(page);
     await mockHangingConversion(page);
     await page.goto('/import');
   });
@@ -221,8 +249,7 @@ test.describe('Cancellation', () => {
   test('shows Cancel all button during active conversion', async ({
     page,
   }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await expect(page).toHaveURL(/\/converting/);
     await expect(
@@ -233,8 +260,7 @@ test.describe('Cancellation', () => {
   test('opens confirmation dialog when Cancel all is clicked', async ({
     page,
   }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await page.getByRole('button', { name: /cancel all/i }).click();
 
@@ -247,8 +273,7 @@ test.describe('Cancellation', () => {
   test('dismisses dialog when dialog Cancel button is clicked', async ({
     page,
   }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await page.getByRole('button', { name: /cancel all/i }).click();
     const dialog = page.getByRole('dialog');
@@ -263,8 +288,7 @@ test.describe('Cancellation', () => {
   });
 
   test('clears queue when cancellation is confirmed', async ({ page }) => {
-    await importFiles(page, ['a.pdf', 'b.pdf', 'c.pdf']);
-    await selectAndConvert(page, ['a.pdf', 'b.pdf', 'c.pdf']);
+    await importAndConvert(page, ['a.pdf', 'b.pdf', 'c.pdf']);
 
     await page.getByRole('button', { name: /cancel all/i }).click();
     const dialog = page.getByRole('dialog');
@@ -277,8 +301,7 @@ test.describe('Cancellation', () => {
   });
 
   test('dismisses dialog on Escape key', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await selectAndConvert(page, ['document.pdf']);
+    await importAndConvert(page, 'document.pdf');
 
     await page.getByRole('button', { name: /cancel all/i }).click();
     const dialog = page.getByRole('dialog');
@@ -289,8 +312,7 @@ test.describe('Cancellation', () => {
   });
 
   test('confirmation message includes remaining count', async ({ page }) => {
-    await importFiles(page, ['x.pdf', 'y.pdf', 'z.pdf']);
-    await selectAndConvert(page, ['x.pdf', 'y.pdf', 'z.pdf']);
+    await importAndConvert(page, ['x.pdf', 'y.pdf', 'z.pdf']);
 
     await page.getByRole('button', { name: /cancel all/i }).click();
     const dialog = page.getByRole('dialog');
@@ -302,13 +324,13 @@ test.describe('Cancellation', () => {
 
 test.describe('Queue display', () => {
   test.beforeEach(async ({ page }) => {
+    await setupBatchConversion(page);
     await mockHangingConversion(page);
     await page.goto('/import');
   });
 
   test('shows active file with Converting badge', async ({ page }) => {
-    await importFile(page, 'active.pdf');
-    await selectAndConvert(page, ['active.pdf']);
+    await importAndConvert(page, 'active.pdf');
 
     await expect(page).toHaveURL(/\/converting/);
     await expect(
@@ -317,8 +339,7 @@ test.describe('Queue display', () => {
   });
 
   test('shows queued files with Queued label', async ({ page }) => {
-    await importFiles(page, ['first.pdf', 'second.pdf', 'third.pdf']);
-    await selectAndConvert(page, ['first.pdf', 'second.pdf', 'third.pdf']);
+    await importAndConvert(page, ['first.pdf', 'second.pdf', 'third.pdf']);
 
     await expect(page).toHaveURL(/\/converting/);
     const queuedLabels = page.getByText('Queued');
@@ -326,8 +347,7 @@ test.describe('Queue display', () => {
   });
 
   test('active file has a progress bar', async ({ page }) => {
-    await importFile(page, 'doc.pdf');
-    await selectAndConvert(page, ['doc.pdf']);
+    await importAndConvert(page, 'doc.pdf');
 
     await expect(page.getByRole('progressbar')).toBeVisible();
   });
@@ -342,8 +362,7 @@ test.describe('Progress bar accessibility', () => {
   });
 
   test('progress bar has correct ARIA attributes', async ({ page }) => {
-    await importFile(page, 'doc.pdf');
-    await selectAndConvert(page, ['doc.pdf']);
+    await importAndConvert(page, 'doc.pdf');
 
     const progressBar = page.getByRole('progressbar');
     await expect(progressBar).toBeVisible();
@@ -365,8 +384,7 @@ test.describe('Navigation', () => {
   });
 
   test('View converted button navigates to /converted', async ({ page }) => {
-    await importFile(page, 'nav-test.pdf');
-    await selectAndConvert(page, ['nav-test.pdf']);
+    await importAndConvert(page, 'nav-test.pdf');
 
     await expect(
       page.getByRole('button', { name: /view converted/i }),
@@ -378,8 +396,7 @@ test.describe('Navigation', () => {
   test('clicking completed file row navigates to /converted', async ({
     page,
   }) => {
-    await importFile(page, 'clickable.pdf');
-    await selectAndConvert(page, ['clickable.pdf']);
+    await importAndConvert(page, 'clickable.pdf');
 
     await expect(page.getByText('Completed')).toBeVisible();
     await page

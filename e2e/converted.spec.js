@@ -8,7 +8,7 @@ function createFakeFile(name) {
   };
 }
 
-async function importFile(page, fileName) {
+async function stageFile(page, fileName) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -16,7 +16,7 @@ async function importFile(page, fileName) {
   await expect(page.getByText(fileName)).toBeVisible();
 }
 
-async function importFiles(page, fileNames) {
+async function stageFiles(page, fileNames) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -26,11 +26,21 @@ async function importFiles(page, fileNames) {
   }
 }
 
-async function selectAndConvert(page, fileNames) {
-  for (const name of fileNames) {
-    await page.getByRole('checkbox', { name: new RegExp(`select ${name}`, 'i') }).click();
+async function importAllStagedToLibrary(page) {
+  for (const checkbox of await page.getByRole('checkbox').all()) {
+    await checkbox.check();
   }
-  await page.getByRole('button', { name: /convert selected/i }).click();
+  await page.getByRole('button', { name: /import to library/i }).click();
+  await expect(page.getByText('No files staged yet.')).toBeVisible();
+}
+
+async function convertFromLibrary(page, fileNames) {
+  const names = Array.isArray(fileNames) ? fileNames : [fileNames];
+  for (const name of names) {
+    await page.locator('nav').getByText('Library').click();
+    await page.getByRole('option').filter({ hasText: name }).click();
+    await page.getByRole('button', { name: /convert to epub/i }).click();
+  }
 }
 
 function mockSuccessfulConversion(page) {
@@ -55,11 +65,12 @@ async function importConvertAndNavigate(page, fileNames) {
   await page.goto('/import');
   const names = Array.isArray(fileNames) ? fileNames : [fileNames];
   if (names.length === 1) {
-    await importFile(page, names[0]);
+    await stageFile(page, names[0]);
   } else {
-    await importFiles(page, names);
+    await stageFiles(page, names);
   }
-  await selectAndConvert(page, names);
+  await importAllStagedToLibrary(page);
+  await convertFromLibrary(page, names);
   await expect(page).toHaveURL(/\/converting/);
   await expect(
     page.getByRole('heading', { name: 'Conversion complete' }),
@@ -313,8 +324,9 @@ test.describe('Converted Screen — Navigation from Converting', () => {
   test('View converted button navigates to converted screen', async ({ page }) => {
     await mockSuccessfulConversion(page);
     await page.goto('/import');
-    await importFile(page, 'nav-test.pdf');
-    await selectAndConvert(page, ['nav-test.pdf']);
+    await stageFile(page, 'nav-test.pdf');
+    await importAllStagedToLibrary(page);
+    await convertFromLibrary(page, 'nav-test.pdf');
 
     await expect(
       page.getByRole('heading', { name: 'Conversion complete' }),
@@ -327,8 +339,9 @@ test.describe('Converted Screen — Navigation from Converting', () => {
   test('clicking completed row navigates to converted screen with file selected', async ({ page }) => {
     await mockSuccessfulConversion(page);
     await page.goto('/import');
-    await importFiles(page, ['first.pdf', 'second.pdf']);
-    await selectAndConvert(page, ['first.pdf', 'second.pdf']);
+    await stageFiles(page, ['first.pdf', 'second.pdf']);
+    await importAllStagedToLibrary(page);
+    await convertFromLibrary(page, ['first.pdf', 'second.pdf']);
 
     await expect(
       page.getByRole('heading', { name: 'Conversion complete' }),

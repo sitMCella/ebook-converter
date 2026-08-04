@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import path from 'path';
 
 test.describe('Import Screen — Layout', () => {
   test.beforeEach(async ({ page }) => {
@@ -18,8 +17,8 @@ test.describe('Import Screen — Layout', () => {
     await expect(page.getByText(/click.*browse files.*to select/i)).toBeVisible();
   });
 
-  test('shows empty state when no files imported', async ({ page }) => {
-    await expect(page.getByText('No files imported yet.')).toBeVisible();
+  test('shows empty state when no files staged', async ({ page }) => {
+    await expect(page.getByText('No files staged yet.')).toBeVisible();
   });
 
   test('sidebar highlights Import as active nav item', async ({ page }) => {
@@ -38,20 +37,20 @@ test.describe('Import Screen — Layout', () => {
 
   test('batch action buttons are present and disabled initially', async ({ page }) => {
     const removeBtn = page.getByRole('button', { name: /remove selected/i });
-    const convertBtn = page.getByRole('button', { name: /convert selected/i });
+    const importBtn = page.getByRole('button', { name: /import to library/i });
     await expect(removeBtn).toBeVisible();
-    await expect(convertBtn).toBeVisible();
+    await expect(importBtn).toBeVisible();
     await expect(removeBtn).toBeDisabled();
-    await expect(convertBtn).toBeDisabled();
+    await expect(importBtn).toBeDisabled();
   });
 });
 
-test.describe('Import Screen — File Import via Browse', () => {
+test.describe('Import Screen — File Staging via Browse', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/import');
   });
 
-  test('browse button triggers file input and imports a PDF', async ({ page }) => {
+  test('browse button triggers file input and stages a PDF', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: /browse files/i }).click();
     const fileChooser = await fileChooserPromise;
@@ -61,10 +60,10 @@ test.describe('Import Screen — File Import via Browse', () => {
     await fileChooser.setFiles(createFakeFile('test-document.pdf'));
 
     await expect(page.getByText('test-document.pdf')).toBeVisible();
-    await expect(page.getByText('No files imported yet.')).not.toBeVisible();
+    await expect(page.getByText('No files staged yet.')).not.toBeVisible();
   });
 
-  test('imports multiple PDF files at once', async ({ page }) => {
+  test('stages multiple PDF files at once', async ({ page }) => {
     const fileChooserPromise = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: /browse files/i }).click();
     const fileChooser = await fileChooserPromise;
@@ -80,20 +79,20 @@ test.describe('Import Screen — File Import via Browse', () => {
     await expect(page.getByText('third.pdf')).toBeVisible();
   });
 
-  test('shows "Recent imports" label when files are present', async ({ page }) => {
-    await importFile(page, 'document.pdf');
-    await expect(page.getByText('Recent imports')).toBeVisible();
+  test('shows "Ready to import" label when files are staged', async ({ page }) => {
+    await stageFile(page, 'document.pdf');
+    await expect(page.getByText('Ready to import')).toBeVisible();
   });
 });
 
 test.describe('Import Screen — Duplicate Detection', () => {
-  test('shows toast when importing a duplicate file', async ({ page }) => {
+  test('shows toast when staging a duplicate file', async ({ page }) => {
     await page.goto('/import');
 
-    await importFile(page, 'duplicate.pdf');
+    await stageFile(page, 'duplicate.pdf');
     await expect(page.getByText('duplicate.pdf')).toBeVisible();
 
-    await importFile(page, 'duplicate.pdf');
+    await stageFile(page, 'duplicate.pdf');
     await expect(page.getByText('File already imported')).toBeVisible();
 
     const rows = page.locator('[class*="border-b"]').filter({ hasText: 'duplicate.pdf' });
@@ -104,8 +103,8 @@ test.describe('Import Screen — Duplicate Detection', () => {
 test.describe('Import Screen — Selection and Batch Actions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/import');
-    await importFile(page, 'file-a.pdf');
-    await importFile(page, 'file-b.pdf');
+    await stageFile(page, 'file-a.pdf');
+    await stageFile(page, 'file-b.pdf');
   });
 
   test('selecting a file enables "Remove selected" button', async ({ page }) => {
@@ -116,67 +115,41 @@ test.describe('Import Screen — Selection and Batch Actions', () => {
     await expect(removeBtn).toBeEnabled();
   });
 
-  test('selecting a ready file enables "Convert selected" button', async ({ page }) => {
-    const convertBtn = page.getByRole('button', { name: /convert selected/i });
-    await expect(convertBtn).toBeDisabled();
+  test('selecting a ready file enables "Import to library" button', async ({ page }) => {
+    const importBtn = page.getByRole('button', { name: /import to library/i });
+    await expect(importBtn).toBeDisabled();
 
     await page.getByRole('checkbox', { name: /select file-a\.pdf/i }).check();
-    await expect(convertBtn).toBeEnabled();
+    await expect(importBtn).toBeEnabled();
   });
 
-  test('remove selected shows confirmation dialog and removes files on confirm', async ({ page }) => {
+  test('remove selected unstages files immediately without confirmation', async ({ page }) => {
     await page.getByRole('checkbox', { name: /select file-a\.pdf/i }).check();
     await page.getByRole('button', { name: /remove selected/i }).click();
 
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/remove 1 file\(s\) from the import list/i)).toBeVisible();
-    await expect(dialog.getByText(/delete the stored copies/i)).toBeVisible();
-
-    await dialog.getByRole('button', { name: /confirm/i }).click();
-
-    await expect(dialog).not.toBeVisible();
     await expect(page.getByText('file-a.pdf')).not.toBeVisible();
     await expect(page.getByText('file-b.pdf')).toBeVisible();
-  });
-
-  test('cancel in confirmation dialog does not remove files', async ({ page }) => {
-    await page.getByRole('checkbox', { name: /select file-a\.pdf/i }).check();
-    await page.getByRole('button', { name: /remove selected/i }).click();
-
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: /cancel/i }).click();
-
-    await expect(dialog).not.toBeVisible();
-    await expect(page.getByText('file-a.pdf')).toBeVisible();
   });
 
   test('removing all files shows empty state again', async ({ page }) => {
     await page.getByRole('checkbox', { name: /select file-a\.pdf/i }).check();
     await page.getByRole('checkbox', { name: /select file-b\.pdf/i }).check();
     await page.getByRole('button', { name: /remove selected/i }).click();
-    await page.getByRole('dialog').getByRole('button', { name: /confirm/i }).click();
 
-    await expect(page.getByText('No files imported yet.')).toBeVisible();
+    await expect(page.getByText('No files staged yet.')).toBeVisible();
   });
 
-  test('convert selected navigates to converting screen', async ({ page }) => {
+  test('import to library moves files from staging to library', async ({ page }) => {
     await page.getByRole('checkbox', { name: /select file-a\.pdf/i }).check();
-    await page.getByRole('button', { name: /convert selected/i }).click();
+    await page.getByRole('button', { name: /import to library/i }).click();
 
-    await expect(page).toHaveURL(/\/converting/);
-  });
-});
+    await expect(page.getByText('file-a.pdf')).not.toBeVisible();
+    await expect(page.getByText('file-b.pdf')).toBeVisible();
 
-test.describe('Import Screen — File Name Navigation', () => {
-  test('clicking a file name navigates to library', async ({ page }) => {
-    await page.goto('/import');
-    await importFile(page, 'navigate-test.pdf');
-
-    await page.getByRole('button', { name: 'navigate-test.pdf' }).click();
-
+    await page.locator('nav').getByText('Library').click();
     await expect(page).toHaveURL(/\/library/);
-    await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+    const listbox = page.getByRole('listbox', { name: /document list/i });
+    await expect(listbox.getByText('file-a.pdf')).toBeVisible();
   });
 });
 
@@ -233,9 +206,9 @@ test.describe('Import Screen — Sidebar Navigation', () => {
     await expect(libraryLink).toHaveClass(/font-medium/);
   });
 
-  test('navigating back to Import via sidebar restores state', async ({ page }) => {
+  test('navigating back to Import via sidebar retains staged files', async ({ page }) => {
     await page.goto('/import');
-    await importFile(page, 'persist-test.pdf');
+    await stageFile(page, 'persist-test.pdf');
 
     await page.locator('nav').getByText('Library').click();
     await page.locator('nav').getByText('Import').click();
@@ -244,27 +217,10 @@ test.describe('Import Screen — Sidebar Navigation', () => {
   });
 });
 
-test.describe('Import Screen — Confirmation Dialog', () => {
-  test('dialog closes on Escape key', async ({ page }) => {
-    await page.goto('/import');
-    await importFile(page, 'escape-test.pdf');
-
-    await page.getByRole('checkbox', { name: /select escape-test\.pdf/i }).check();
-    await page.getByRole('button', { name: /remove selected/i }).click();
-
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await expect(dialog).not.toBeVisible();
-    await expect(page.getByText('escape-test.pdf')).toBeVisible();
-  });
-});
-
 test.describe('Import Screen — Status Badges', () => {
   test('does not show status badge for non-error files', async ({ page }) => {
     await page.goto('/import');
-    await importFile(page, 'accessible.pdf');
+    await stageFile(page, 'accessible.pdf');
 
     const badge = page.locator('[aria-label="Status: Ready"]');
     await expect(badge).not.toBeVisible();
@@ -287,7 +243,7 @@ function createFakeFile(name) {
   };
 }
 
-async function importFile(page, fileName) {
+async function stageFile(page, fileName) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;

@@ -1,0 +1,69 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+
+vi.mock('../../lib/tauri', async (importOriginal) => ({
+  ...(await importOriginal()),
+  openFileWithSystem: vi.fn(),
+  saveFile: vi.fn(),
+  isTauri: true,
+}));
+
+import { EpubDetailPanel } from './EpubDetailPanel';
+import { openFileWithSystem } from '../../lib/tauri';
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
+const baseFile = {
+  path: '/docs/design-patterns.pdf',
+  name: 'Design patterns.pdf',
+  outputPath: '/output/Design patterns.epub',
+  conversionResult: {
+    outputPath: '/output/Design patterns.epub',
+    chapters: 23,
+    images: 47,
+    fileSize: 3250585,
+  },
+};
+
+function renderPanel(file = baseFile) {
+  return render(
+    <MemoryRouter>
+      <EpubDetailPanel file={file} />
+    </MemoryRouter>,
+  );
+}
+
+describe('EpubDetailPanel (Tauri mode)', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it('shows "Open in reader" button when isTauri is true', () => {
+    renderPanel();
+    expect(screen.getByText('Open in reader')).toBeInTheDocument();
+  });
+
+  it('shows "Save as..." button when isTauri is true', () => {
+    renderPanel();
+    expect(screen.getByText('Save as...')).toBeInTheDocument();
+  });
+
+  it('calls openFileWithSystem with outputPath on "Open in reader" click', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByText('Open in reader'));
+    expect(openFileWithSystem).toHaveBeenCalledWith('/output/Design patterns.epub');
+  });
+
+  it('does not call openFileWithSystem when outputPath is missing', async () => {
+    const user = userEvent.setup();
+    renderPanel({ ...baseFile, outputPath: undefined });
+
+    await user.click(screen.getByText('Open in reader'));
+    expect(openFileWithSystem).not.toHaveBeenCalled();
+  });
+});

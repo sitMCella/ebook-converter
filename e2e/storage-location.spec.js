@@ -8,7 +8,7 @@ function createFakeFile(name) {
   };
 }
 
-async function importFile(page, fileName) {
+async function stageFile(page, fileName) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -16,7 +16,7 @@ async function importFile(page, fileName) {
   await expect(page.getByText(fileName)).toBeVisible();
 }
 
-async function importFiles(page, fileNames) {
+async function stageFiles(page, fileNames) {
   const fileChooserPromise = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: /browse files/i }).click();
   const fileChooser = await fileChooserPromise;
@@ -26,11 +26,21 @@ async function importFiles(page, fileNames) {
   }
 }
 
-async function selectAndConvert(page, fileNames) {
-  for (const name of fileNames) {
-    await page.getByRole('checkbox', { name: new RegExp(`select ${name}`, 'i') }).click();
+async function importAllStagedToLibrary(page) {
+  for (const checkbox of await page.getByRole('checkbox').all()) {
+    await checkbox.check();
   }
-  await page.getByRole('button', { name: /convert selected/i }).click();
+  await page.getByRole('button', { name: /import to library/i }).click();
+  await expect(page.getByText('No files staged yet.')).toBeVisible();
+}
+
+async function convertFromLibrary(page, fileNames) {
+  const names = Array.isArray(fileNames) ? fileNames : [fileNames];
+  for (const name of names) {
+    await page.locator('nav').getByText('Library').click();
+    await page.getByRole('option').filter({ hasText: name }).click();
+    await page.getByRole('button', { name: /convert to epub/i }).click();
+  }
 }
 
 function mockStorageOperations(page) {
@@ -50,15 +60,6 @@ function mockStorageOperations(page) {
     );
 
     modified = modified.replace(
-      'async function deleteBook(bookId) {',
-      [
-        'async function deleteBook(bookId) {',
-        'window.__deleteBookCalls = window.__deleteBookCalls || [];',
-        'window.__deleteBookCalls.push(bookId);',
-      ].join('\n'),
-    );
-
-    modified = modified.replace(
       'return Promise.reject(new Error("Conversion requires the desktop app"))',
       [
         'window.__convertCalls = window.__convertCalls || [];',
@@ -71,7 +72,7 @@ function mockStorageOperations(page) {
   });
 }
 
-// --- Storage on Import ---
+// --- Storage on Import to Library ---
 
 test.describe('Storage location — PDF import creates book in managed storage', () => {
   test.beforeEach(async ({ page }) => {
@@ -79,8 +80,14 @@ test.describe('Storage location — PDF import creates book in managed storage',
     await page.goto('/import');
   });
 
-  test('importPdf is called when importing a file', async ({ page }) => {
-    await importFile(page, 'storage-test.pdf');
+  test('importPdf is called when importing staged files to library', async ({ page }) => {
+    await stageFile(page, 'storage-test.pdf');
+
+    const callsBefore = await page.evaluate(() => window.__importPdfCalls);
+    expect(callsBefore).toBeFalsy();
+
+    await page.getByRole('checkbox', { name: /select storage-test\.pdf/i }).check();
+    await page.getByRole('button', { name: /import to library/i }).click();
 
     const calls = await page.evaluate(() => window.__importPdfCalls);
     expect(calls).toHaveLength(1);
@@ -89,7 +96,8 @@ test.describe('Storage location — PDF import creates book in managed storage',
   });
 
   test('each imported file gets a unique bookId', async ({ page }) => {
-    await importFiles(page, ['first.pdf', 'second.pdf', 'third.pdf']);
+    await stageFiles(page, ['first.pdf', 'second.pdf', 'third.pdf']);
+    await importAllStagedToLibrary(page);
 
     const calls = await page.evaluate(() => window.__importPdfCalls);
     expect(calls).toHaveLength(3);
@@ -99,62 +107,36 @@ test.describe('Storage location — PDF import creates book in managed storage',
     expect(uniqueIds.size).toBe(3);
   });
 
-  test('file appears in import list after storage import', async ({ page }) => {
-    await importFile(page, 'ready-check.pdf');
-    await expect(page.getByText('ready-check.pdf')).toBeVisible();
-    await expect(page.locator('[aria-label="Status: Ready"]')).not.toBeVisible();
+  test('file appears in library after import', async ({ page }) => {
+    await stageFile(page, 'ready-check.pdf');
+    await page.getByRole('checkbox', { name: /select ready-check\.pdf/i }).check();
+    await page.getByRole('button', { name: /import to library/i }).click();
+
+    await page.locator('nav').getByText('Library').click();
+    const listbox = page.getByRole('listbox', { name: /document list/i });
+    await expect(listbox.getByText('ready-check.pdf')).toBeVisible();
   });
 });
 
-// --- Storage Cleanup on Remove ---
+// --- Staging Removal is Non-Destructive ---
 
-test.describe('Storage location — book deletion on file removal', () => {
+test.describe('Storage location — staging removal does not delete storage', () => {
   test.beforeEach(async ({ page }) => {
     await mockStorageOperations(page);
     await page.goto('/import');
   });
 
-  test('deleteBook is called with correct bookId when removing a stored file', async ({ page }) => {
-    await importFile(page, 'delete-test.pdf');
+  test('removing staged files does not call importPdf or deleteBook', async ({ page }) => {
+    await stageFile(page, 'remove-test.pdf');
+
+    await page.getByRole('checkbox', { name: /select remove-test\.pdf/i }).check();
+    await page.getByRole('button', { name: /remove selected/i }).click();
+
+    await expect(page.getByText('remove-test.pdf')).not.toBeVisible();
+    await expect(page.getByText('No files staged yet.')).toBeVisible();
 
     const importCalls = await page.evaluate(() => window.__importPdfCalls);
-    const bookId = importCalls[0].bookId;
-
-    await page.getByRole('checkbox', { name: /select delete-test\.pdf/i }).check();
-    await page.getByRole('button', { name: /remove selected/i }).click();
-    await page.getByRole('dialog').getByRole('button', { name: /confirm/i }).click();
-
-    await expect(page.getByText('delete-test.pdf')).not.toBeVisible();
-
-    const deleteCalls = await page.evaluate(() => window.__deleteBookCalls);
-    expect(deleteCalls).toHaveLength(1);
-    expect(deleteCalls[0]).toBe(bookId);
-  });
-
-  test('deleteBook is called for each file in batch removal', async ({ page }) => {
-    await importFiles(page, ['remove-a.pdf', 'remove-b.pdf']);
-
-    await page.getByRole('checkbox', { name: /select remove-a\.pdf/i }).check();
-    await page.getByRole('checkbox', { name: /select remove-b\.pdf/i }).check();
-    await page.getByRole('button', { name: /remove selected/i }).click();
-    await page.getByRole('dialog').getByRole('button', { name: /confirm/i }).click();
-
-    await expect(page.getByText('remove-a.pdf')).not.toBeVisible();
-    await expect(page.getByText('remove-b.pdf')).not.toBeVisible();
-
-    const deleteCalls = await page.evaluate(() => window.__deleteBookCalls);
-    expect(deleteCalls).toHaveLength(2);
-  });
-
-  test('removal succeeds even if deleteBook fails gracefully', async ({ page }) => {
-    await importFile(page, 'fail-delete.pdf');
-
-    await page.getByRole('checkbox', { name: /select fail-delete\.pdf/i }).check();
-    await page.getByRole('button', { name: /remove selected/i }).click();
-    await page.getByRole('dialog').getByRole('button', { name: /confirm/i }).click();
-
-    await expect(page.getByText('fail-delete.pdf')).not.toBeVisible();
-    await expect(page.getByText('No files imported yet.')).toBeVisible();
+    expect(importCalls).toBeFalsy();
   });
 });
 
@@ -167,8 +149,9 @@ test.describe('Storage location — conversion uses book directory', () => {
   });
 
   test('bookId is included in conversion options for stored files', async ({ page }) => {
-    await importFile(page, 'convert-stored.pdf');
-    await selectAndConvert(page, ['convert-stored.pdf']);
+    await stageFile(page, 'convert-stored.pdf');
+    await importAllStagedToLibrary(page);
+    await convertFromLibrary(page, 'convert-stored.pdf');
 
     await expect(page.getByRole('heading', { name: 'Conversion complete' })).toBeVisible();
 
@@ -178,8 +161,9 @@ test.describe('Storage location — conversion uses book directory', () => {
   });
 
   test('storedPdfPath is used as conversion input path', async ({ page }) => {
-    await importFile(page, 'stored-path.pdf');
-    await selectAndConvert(page, ['stored-path.pdf']);
+    await stageFile(page, 'stored-path.pdf');
+    await importAllStagedToLibrary(page);
+    await convertFromLibrary(page, 'stored-path.pdf');
 
     await expect(page.getByRole('heading', { name: 'Conversion complete' })).toBeVisible();
 
@@ -189,8 +173,9 @@ test.describe('Storage location — conversion uses book directory', () => {
   });
 
   test('batch conversion passes correct bookId for each file', async ({ page }) => {
-    await importFiles(page, ['batch-a.pdf', 'batch-b.pdf']);
-    await selectAndConvert(page, ['batch-a.pdf', 'batch-b.pdf']);
+    await stageFiles(page, ['batch-a.pdf', 'batch-b.pdf']);
+    await importAllStagedToLibrary(page);
+    await convertFromLibrary(page, ['batch-a.pdf', 'batch-b.pdf']);
 
     await expect(page.getByRole('heading', { name: 'Conversion complete' })).toBeVisible();
 

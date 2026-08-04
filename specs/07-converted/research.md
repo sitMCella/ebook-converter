@@ -20,7 +20,7 @@
 
 | Capability | Impact | Mitigation |
 |---|---|---|
-| Shell plugin for opening files/folders | Cannot open EPUB in system reader or folder in file manager | Add `openFileWithSystem()` and `openFolder()` bridge functions; no-op in browser mode; install shell plugin when needed |
+| ~~Shell plugin for opening files/folders~~ | ~~Resolved~~ | Shell plugin installed: `@tauri-apps/plugin-shell` (npm), `tauri-plugin-shell` (Cargo), registered in `lib.rs`, `shell:allow-open` capability granted. `openFileWithSystem()` and `openFolder()` bridge functions fully operational in Tauri mode; no-op in browser mode |
 | EPUB content parsing | Cannot render chapter preview or extract TOC | Show placeholder UI with book icon and chapter count |
 | Conversion timestamp | Cannot show exact conversion date/time | Omit field initially; add `convertedAt` to `BookMetadata` and `SET_CONVERSION_RESULT` in a future enhancement |
 | EPUB file reading from disk | "Save as" needs to read the EPUB bytes to copy them | Use `readFile` from Tauri fs plugin (already available) |

@@ -21,15 +21,217 @@ describe('ImportContext', () => {
   });
 
   describe('initial state', () => {
-    it('starts with empty files and no selections', () => {
+    it('starts with empty files, stagedFiles, and no selections', () => {
       const { result } = renderImportContext();
       expect(result.current.state.files.size).toBe(0);
+      expect(result.current.state.stagedFiles.size).toBe(0);
       expect(result.current.state.selectedPaths.size).toBe(0);
     });
   });
 
-  describe('ADD_FILES', () => {
-    it('adds files to the map', () => {
+  describe('STAGE_FILES', () => {
+    it('adds files to the staged map', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [
+            { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+            { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+          ],
+        });
+      });
+      expect(result.current.state.stagedFiles.size).toBe(2);
+      expect(result.current.state.stagedFiles.get('/a.pdf').name).toBe('a.pdf');
+      expect(result.current.state.files.size).toBe(0);
+    });
+
+    it('does not overwrite existing staged files with the same path', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a-duplicate.pdf', status: 'error' }],
+        });
+      });
+      expect(result.current.state.stagedFiles.size).toBe(1);
+      expect(result.current.state.stagedFiles.get('/a.pdf').name).toBe('a.pdf');
+    });
+  });
+
+  describe('UNSTAGE_FILES', () => {
+    it('removes files from staged map', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [
+            { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+            { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+          ],
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'UNSTAGE_FILES', paths: ['/a.pdf'] });
+      });
+      expect(result.current.state.stagedFiles.size).toBe(1);
+      expect(result.current.state.stagedFiles.has('/a.pdf')).toBe(false);
+    });
+
+    it('also removes selections for unstaged files', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_SELECTION', path: '/a.pdf' });
+      });
+      expect(result.current.state.selectedPaths.has('/a.pdf')).toBe(true);
+      act(() => {
+        result.current.dispatch({ type: 'UNSTAGE_FILES', paths: ['/a.pdf'] });
+      });
+      expect(result.current.state.selectedPaths.has('/a.pdf')).toBe(false);
+    });
+  });
+
+  describe('UPDATE_STAGED_STATUS', () => {
+    it('updates staged file status and error message', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'UPDATE_STAGED_STATUS',
+          path: '/a.pdf',
+          status: 'error',
+          errorMessage: 'Corrupted file',
+        });
+      });
+      const file = result.current.state.stagedFiles.get('/a.pdf');
+      expect(file.status).toBe('error');
+      expect(file.errorMessage).toBe('Corrupted file');
+    });
+
+    it('ignores update for non-existent staged path', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'UPDATE_STAGED_STATUS',
+          path: '/nonexistent.pdf',
+          status: 'error',
+        });
+      });
+      expect(result.current.state.stagedFiles.size).toBe(0);
+    });
+  });
+
+  describe('SET_STAGED_METADATA', () => {
+    it('sets metadata on a staged file', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: null }],
+        });
+      });
+      const metadata = { title: 'Test', pageCount: 5 };
+      act(() => {
+        result.current.dispatch({ type: 'SET_STAGED_METADATA', path: '/a.pdf', metadata });
+      });
+      expect(result.current.state.stagedFiles.get('/a.pdf').metadata).toEqual(metadata);
+    });
+
+    it('ignores metadata for non-existent staged path', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'SET_STAGED_METADATA',
+          path: '/nonexistent.pdf',
+          metadata: { title: 'Test' },
+        });
+      });
+      expect(result.current.state.stagedFiles.size).toBe(0);
+    });
+  });
+
+  describe('IMPORT_TO_LIBRARY', () => {
+    it('moves a staged file to the library with storage info', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: { title: 'Test' } }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({
+          type: 'IMPORT_TO_LIBRARY',
+          path: '/a.pdf',
+          bookId: 'uuid-123',
+          storedPdfPath: '/books/uuid-123/a.pdf',
+        });
+      });
+      expect(result.current.state.stagedFiles.size).toBe(0);
+      expect(result.current.state.files.size).toBe(1);
+      const file = result.current.state.files.get('/a.pdf');
+      expect(file.name).toBe('a.pdf');
+      expect(file.bookId).toBe('uuid-123');
+      expect(file.storedPdfPath).toBe('/books/uuid-123/a.pdf');
+      expect(file.metadata.title).toBe('Test');
+    });
+
+    it('clears selection for imported file', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'STAGE_FILES',
+          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+        });
+      });
+      act(() => {
+        result.current.dispatch({ type: 'TOGGLE_SELECTION', path: '/a.pdf' });
+      });
+      expect(result.current.state.selectedPaths.has('/a.pdf')).toBe(true);
+      act(() => {
+        result.current.dispatch({
+          type: 'IMPORT_TO_LIBRARY',
+          path: '/a.pdf',
+          bookId: 'uuid-123',
+          storedPdfPath: '/books/uuid-123/a.pdf',
+        });
+      });
+      expect(result.current.state.selectedPaths.has('/a.pdf')).toBe(false);
+    });
+
+    it('ignores import for non-existent staged path', () => {
+      const { result } = renderImportContext();
+      act(() => {
+        result.current.dispatch({
+          type: 'IMPORT_TO_LIBRARY',
+          path: '/nonexistent.pdf',
+          bookId: 'uuid-123',
+          storedPdfPath: '/books/uuid-123/nonexistent.pdf',
+        });
+      });
+      expect(result.current.state.files.size).toBe(0);
+    });
+  });
+
+  describe('ADD_FILES (library)', () => {
+    it('adds files to the library map', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -44,7 +246,7 @@ describe('ImportContext', () => {
       expect(result.current.state.files.get('/a.pdf').name).toBe('a.pdf');
     });
 
-    it('does not overwrite existing files with the same path', () => {
+    it('does not overwrite existing library files with the same path', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -63,8 +265,8 @@ describe('ImportContext', () => {
     });
   });
 
-  describe('REMOVE_FILES', () => {
-    it('removes files by path', () => {
+  describe('REMOVE_FILES (library)', () => {
+    it('removes files by path from library', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -81,28 +283,10 @@ describe('ImportContext', () => {
       expect(result.current.state.files.size).toBe(1);
       expect(result.current.state.files.has('/a.pdf')).toBe(false);
     });
-
-    it('also removes selections for removed files', () => {
-      const { result } = renderImportContext();
-      act(() => {
-        result.current.dispatch({
-          type: 'ADD_FILES',
-          files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
-        });
-      });
-      act(() => {
-        result.current.dispatch({ type: 'TOGGLE_SELECTION', path: '/a.pdf' });
-      });
-      expect(result.current.state.selectedPaths.has('/a.pdf')).toBe(true);
-      act(() => {
-        result.current.dispatch({ type: 'REMOVE_FILES', paths: ['/a.pdf'] });
-      });
-      expect(result.current.state.selectedPaths.has('/a.pdf')).toBe(false);
-    });
   });
 
-  describe('UPDATE_STATUS', () => {
-    it('updates file status and error message', () => {
+  describe('UPDATE_STATUS (library)', () => {
+    it('updates library file status and error message', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -136,8 +320,8 @@ describe('ImportContext', () => {
     });
   });
 
-  describe('SET_METADATA', () => {
-    it('sets metadata on a file', () => {
+  describe('SET_METADATA (library)', () => {
+    it('sets metadata on a library file', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -170,7 +354,7 @@ describe('ImportContext', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
-          type: 'ADD_FILES',
+          type: 'STAGE_FILES',
           files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
         });
       });
@@ -184,7 +368,7 @@ describe('ImportContext', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
-          type: 'ADD_FILES',
+          type: 'STAGE_FILES',
           files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
         });
       });
@@ -199,11 +383,11 @@ describe('ImportContext', () => {
   });
 
   describe('SELECT_ALL', () => {
-    it('selects all files', () => {
+    it('selects all staged files', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
-          type: 'ADD_FILES',
+          type: 'STAGE_FILES',
           files: [
             { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
             { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
@@ -222,7 +406,7 @@ describe('ImportContext', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
-          type: 'ADD_FILES',
+          type: 'STAGE_FILES',
           files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
         });
       });
@@ -310,7 +494,7 @@ describe('ImportContext', () => {
   });
 
   describe('SET_STORAGE_INFO', () => {
-    it('sets bookId and storedPdfPath on a file', () => {
+    it('sets bookId and storedPdfPath on a library file', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -408,7 +592,7 @@ describe('ImportContext', () => {
   });
 
   describe('LOAD_LIBRARY', () => {
-    it('loads books into the files map', () => {
+    it('loads books into the library files map', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
@@ -439,9 +623,10 @@ describe('ImportContext', () => {
       expect(file.storedPdfPath).toBe('/books/uuid-1/source.pdf');
       expect(file.metadata.title).toBe('Report');
       expect(file.metadata.pageCount).toBe(15);
+      expect(result.current.state.stagedFiles.size).toBe(0);
     });
 
-    it('does not overwrite existing files', () => {
+    it('does not overwrite existing library files', () => {
       const { result } = renderImportContext();
       act(() => {
         result.current.dispatch({
