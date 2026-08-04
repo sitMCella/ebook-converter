@@ -124,7 +124,12 @@ pub async fn run_conversion(
 
     emit_progress(app, &path_owned, "assembling_epub", 90, "Writing EPUB file...");
 
-    let result = epub_generator::generate_epub(&chapters, &images, &metadata, options, &output_path)?;
+    let mut result = epub_generator::generate_epub(&chapters, &images, &metadata, options, &output_path)?;
+
+    let pdf_outline = pdf::extract_outline(path);
+    if !pdf_outline.is_empty() {
+        result.toc = pdf_outline;
+    }
 
     emit_progress(app, &path_owned, "complete", 100, "Conversion complete.");
 

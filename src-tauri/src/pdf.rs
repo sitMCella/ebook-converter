@@ -104,6 +104,68 @@ pub fn get_pdf_metadata(path: String) -> Result<PdfMetadata, String> {
     })
 }
 
+pub fn extract_outline(path: &str) -> Vec<crate::conversion::TocEntry> {
+    let doc = match Document::load(path) {
+        Ok(d) => d,
+        Err(_) => return Vec::new(),
+    };
+
+    let catalog = match doc.catalog() {
+        Ok(c) => c,
+        Err(_) => return Vec::new(),
+    };
+
+    let outlines_ref = match catalog.get(b"Outlines") {
+        Ok(obj) => match doc.dereference(obj) {
+            Ok((_, obj)) => obj.clone(),
+            Err(_) => return Vec::new(),
+        },
+        Err(_) => return Vec::new(),
+    };
+
+    let outlines_dict = match outlines_ref {
+        lopdf::Object::Dictionary(d) => d,
+        _ => return Vec::new(),
+    };
+
+    let mut entries = Vec::new();
+    if let Ok(first) = outlines_dict.get(b"First") {
+        if let Ok(first_id) = first.as_reference() {
+            collect_outline_items(&doc, first_id, 1, &mut entries);
+        }
+    }
+
+    entries
+}
+
+fn collect_outline_items(
+    doc: &Document,
+    item_id: lopdf::ObjectId,
+    level: u8,
+    entries: &mut Vec<crate::conversion::TocEntry>,
+) {
+    let dict = match doc.get_dictionary(item_id) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+
+    if let Some(title) = get_string_from_dict(dict, b"Title") {
+        entries.push(crate::conversion::TocEntry { title, level });
+    }
+
+    if let Ok(first_child) = dict.get(b"First") {
+        if let Ok(child_id) = first_child.as_reference() {
+            collect_outline_items(doc, child_id, level + 1, entries);
+        }
+    }
+
+    if let Ok(next) = dict.get(b"Next") {
+        if let Ok(next_id) = next.as_reference() {
+            collect_outline_items(doc, next_id, level, entries);
+        }
+    }
+}
+
 fn get_string_from_dict(dict: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
     dict.get(key).ok().and_then(|obj| match obj {
         lopdf::Object::String(bytes, _) => {
@@ -515,5 +577,149 @@ mod tests {
         assert!(json.contains("\"pageCount\":5"));
         assert!(json.contains("\"pdfVersion\":\"1.7\""));
         assert!(json.contains("\"fileSize\":1024"));
+    }
+
+    // -- extract_outline tests --
+
+    fn create_pdf_with_outlines() -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let item2_id = doc.new_object_id();
+        let item1_id = doc.new_object_id();
+
+        let item2 = dictionary! {
+            "Title" => Object::String(b"Chapter 2: Advanced Topics".to_vec(), lopdf::StringFormat::Literal),
+            "Parent" => item1_id, // just needs a parent ref, not accurate but enough for traversal
+        };
+        doc.objects.insert(item2_id, Object::Dictionary(item2));
+
+        let item1 = dictionary! {
+            "Title" => Object::String(b"Chapter 1: Getting Started".to_vec(), lopdf::StringFormat::Literal),
+            "Next" => Object::Reference(item2_id),
+        };
+        doc.objects.insert(item1_id, Object::Dictionary(item1));
+
+        let outlines_id = doc.add_object(dictionary! {
+            "Type" => "Outlines",
+            "First" => Object::Reference(item1_id),
+            "Last" => Object::Reference(item2_id),
+            "Count" => Object::Integer(2),
+        });
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+            "Outlines" => Object::Reference(outlines_id),
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    fn create_pdf_with_nested_outlines() -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let child_id = doc.new_object_id();
+        let parent_item_id = doc.new_object_id();
+
+        let child = dictionary! {
+            "Title" => Object::String(b"Section 1.1".to_vec(), lopdf::StringFormat::Literal),
+            "Parent" => parent_item_id,
+        };
+        doc.objects.insert(child_id, Object::Dictionary(child));
+
+        let parent_item = dictionary! {
+            "Title" => Object::String(b"Chapter 1".to_vec(), lopdf::StringFormat::Literal),
+            "First" => Object::Reference(child_id),
+            "Last" => Object::Reference(child_id),
+        };
+        doc.objects.insert(parent_item_id, Object::Dictionary(parent_item));
+
+        let outlines_id = doc.add_object(dictionary! {
+            "Type" => "Outlines",
+            "First" => Object::Reference(parent_item_id),
+            "Last" => Object::Reference(parent_item_id),
+            "Count" => Object::Integer(2),
+        });
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+            "Outlines" => Object::Reference(outlines_id),
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    #[test]
+    fn extract_outline_from_pdf_with_bookmarks() {
+        let file = create_pdf_with_outlines();
+        let entries = extract_outline(file.path().to_str().unwrap());
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].title, "Chapter 1: Getting Started");
+        assert_eq!(entries[0].level, 1);
+        assert_eq!(entries[1].title, "Chapter 2: Advanced Topics");
+        assert_eq!(entries[1].level, 1);
+    }
+
+    #[test]
+    fn extract_outline_returns_empty_for_no_outlines() {
+        let file = create_valid_pdf();
+        let entries = extract_outline(file.path().to_str().unwrap());
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn extract_outline_returns_empty_for_invalid_path() {
+        let entries = extract_outline("/nonexistent/path.pdf");
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn extract_outline_handles_nested_entries() {
+        let file = create_pdf_with_nested_outlines();
+        let entries = extract_outline(file.path().to_str().unwrap());
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].title, "Chapter 1");
+        assert_eq!(entries[0].level, 1);
+        assert_eq!(entries[1].title, "Section 1.1");
+        assert_eq!(entries[1].level, 2);
     }
 }
