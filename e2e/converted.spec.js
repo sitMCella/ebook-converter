@@ -304,10 +304,6 @@ test.describe('Converted Screen — Action Buttons', () => {
     await expect(page.getByRole('button', { name: /open in reader/i })).not.toBeVisible();
   });
 
-  test('hides Save as button in browser mode', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /save as/i })).not.toBeVisible();
-  });
-
   test('hides Open folder button in browser mode', async ({ page }) => {
     await expect(page.getByRole('button', { name: /open folder/i })).not.toBeVisible();
   });

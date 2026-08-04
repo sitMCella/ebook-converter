@@ -6,7 +6,6 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../../lib/tauri', async (importOriginal) => ({
   ...(await importOriginal()),
   openFileWithSystem: vi.fn(),
-  saveFile: vi.fn(),
   isTauri: false,
 }));
 
@@ -52,10 +51,9 @@ describe('EpubDetailPanel', () => {
     expect(screen.getByText('Reconvert')).toBeInTheDocument();
   });
 
-  it('hides "Open in reader" and "Save as..." in browser mode', () => {
+  it('hides "Open in reader" in browser mode', () => {
     renderPanel();
     expect(screen.queryByText('Open in reader')).not.toBeInTheDocument();
-    expect(screen.queryByText('Save as...')).not.toBeInTheDocument();
   });
 
   it('navigates to library with source path on Reconvert click', async () => {
