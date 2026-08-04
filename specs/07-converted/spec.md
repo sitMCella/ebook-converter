@@ -52,8 +52,7 @@ A collapsible section showing the EPUB's generated TOC as an indented, clickable
 Stacked vertically, full width, below the metadata:
 
 1. **"Open in reader"** — primary button, `ExternalLink` icon. Opens the EPUB file in the system's default EPUB reader application via a Tauri shell command. In browser mode, triggers a download.
-2. **"Save as..."** — secondary button, `Download` icon. Opens a Tauri native save dialog so the user can save a copy to a different location. Uses the existing `saveFile()` bridge function.
-3. **"Reconvert"** — secondary button, `RefreshCw` icon. Navigates to the Library screen with the source PDF selected and the conversion options panel expanded.
+2. **"Reconvert"** — secondary button, `RefreshCw` icon. Navigates to the Library screen with the source PDF selected and the conversion options panel expanded.
 
 ### FR-7: Header — Open Folder
 

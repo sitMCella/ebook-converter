@@ -23,7 +23,6 @@
 | ~~Shell plugin for opening files/folders~~ | ~~Resolved~~ | Shell plugin installed: `@tauri-apps/plugin-shell` (npm), `tauri-plugin-shell` (Cargo), registered in `lib.rs`, `shell:allow-open` capability granted. `openFileWithSystem()` and `openFolder()` bridge functions fully operational in Tauri mode; no-op in browser mode |
 | EPUB content parsing | Cannot render chapter preview or extract TOC | Show placeholder UI with book icon and chapter count |
 | Conversion timestamp | Cannot show exact conversion date/time | Omit field initially; add `convertedAt` to `BookMetadata` and `SET_CONVERSION_RESULT` in a future enhancement |
-| EPUB file reading from disk | "Save as" needs to read the EPUB bytes to copy them | Use `readFile` from Tauri fs plugin (already available) |
 
 ## Two-Panel Layout Pattern (Reuse from Library)
 
@@ -72,7 +71,7 @@ await open('/path/to/folder/');
 - Capability: `"shell:allow-open"` in `src-tauri/capabilities/default.json`
 
 ### Browser Fallback
-In browser mode, `openFileWithSystem` is a no-op (the EPUB file is not on the local filesystem in a browser context). The "Open in reader" button could alternatively trigger a download using `saveFile()`, but this conflates it with "Save as...". For browser mode, the button is hidden or shows a tooltip explaining it requires the desktop app.
+In browser mode, `openFileWithSystem` is a no-op (the EPUB file is not on the local filesystem in a browser context). For browser mode, the button is hidden or shows a tooltip explaining it requires the desktop app.
 
 ## Component Naming
 
