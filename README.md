@@ -73,7 +73,15 @@ The first run compiles the Rust backend, which takes 1-2 minutes. Subsequent run
 
 ### Clearing the Cache
 
-To clear the Tauri WebView cache (e.g. after frontend changes aren't reflected):
+If frontend changes aren't reflected, first kill any running instances and clean build artifacts:
+
+```bash
+pkill -f "ebook-converter" ; pkill -f "Ebook Converter"
+rm -rf dist
+rm -rf src-tauri/target/debug/build
+```
+
+Then clear the Tauri WebView cache:
 
 **macOS:**
 ```bash
