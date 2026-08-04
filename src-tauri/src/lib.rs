@@ -5,12 +5,17 @@ mod storage;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+#[tauri::command]
+fn open_path(path: String) -> Result<(), String> {
+    open::that_detached(&path)
+        .map_err(|e| format!("Failed to open path: {e}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_shell::init())
     .manage(conversion::ConversionState {
         cancel_tokens: Mutex::new(HashMap::new()),
     })
@@ -24,6 +29,7 @@ pub fn run() {
       storage::get_books_dir,
       storage::save_book_metadata,
       storage::list_books,
+      open_path,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

@@ -177,15 +177,13 @@ async function onConversionProgress(callback) {
   return () => {};
 }
 
-const SHELL_PLUGIN = '@tauri-apps/' + 'plugin-shell';
-
 async function openFileWithSystem(path) {
   if (isTauri) {
     try {
-      const mod = await import(/* @vite-ignore */ SHELL_PLUGIN);
-      return mod.open(path);
-    } catch {
-      // shell plugin not installed
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke('open_path', { path });
+    } catch (err) {
+      console.error('openFileWithSystem failed:', err);
     }
   }
 }
@@ -193,10 +191,10 @@ async function openFileWithSystem(path) {
 async function openFolder(path) {
   if (isTauri) {
     try {
-      const mod = await import(/* @vite-ignore */ SHELL_PLUGIN);
-      return mod.open(path);
-    } catch {
-      // shell plugin not installed
+      const { invoke } = await import('@tauri-apps/api/core');
+      return await invoke('open_path', { path });
+    } catch (err) {
+      console.error('openFolder failed:', err);
     }
   }
 }
