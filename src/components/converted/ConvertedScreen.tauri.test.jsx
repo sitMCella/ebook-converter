@@ -8,13 +8,14 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
   listBooks: vi.fn().mockResolvedValue([]),
   openFileWithSystem: vi.fn(),
   openFolder: vi.fn(),
+  getBooksDir: vi.fn().mockResolvedValue('/app-data/books'),
   isTauri: true,
 }));
 
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionProvider } from '../../contexts/ConversionContext';
 import { ConvertedScreen } from './ConvertedScreen';
-import { openFolder } from '../../lib/tauri';
+import { openFolder, getBooksDir } from '../../lib/tauri';
 import { useEffect } from 'react';
 
 const mockNavigate = vi.fn();
@@ -29,9 +30,9 @@ const convertedFiles = [
     name: 'Design patterns.pdf',
     size: 13003776,
     status: 'converted',
-    outputPath: '/output/Design patterns.epub',
+    outputPath: '/app-data/books/abc-123/Design patterns.epub',
     conversionResult: {
-      outputPath: '/output/Design patterns.epub',
+      outputPath: '/app-data/books/abc-123/Design patterns.epub',
       chapters: 23,
       images: 47,
       fileSize: 3250585,
@@ -70,25 +71,25 @@ function renderConverted({ files = convertedFiles } = {}) {
 
 describe('ConvertedScreen (Tauri mode)', () => {
   beforeEach(() => vi.clearAllMocks());
+
   it('shows "Open folder" button when isTauri is true', () => {
     renderConverted();
     expect(screen.getByText('Open folder')).toBeInTheDocument();
   });
 
-  it('calls openFolder with the output directory on click', async () => {
+  it('calls openFolder with the books directory on click', async () => {
     const user = userEvent.setup();
     renderConverted();
 
     await user.click(screen.getByText('Open folder'));
-    expect(openFolder).toHaveBeenCalledWith('/output');
+    expect(getBooksDir).toHaveBeenCalled();
+    expect(openFolder).toHaveBeenCalledWith('/app-data/books');
   });
 
-  it('does not call openFolder when converted file has no outputPath', async () => {
+  it('does not call openFolder when getBooksDir returns empty string', async () => {
+    getBooksDir.mockResolvedValueOnce('');
     const user = userEvent.setup();
-    const filesNoOutput = [
-      { ...convertedFiles[0], outputPath: undefined },
-    ];
-    renderConverted({ files: filesNoOutput });
+    renderConverted();
 
     await user.click(screen.getByText('Open folder'));
     expect(openFolder).not.toHaveBeenCalled();
