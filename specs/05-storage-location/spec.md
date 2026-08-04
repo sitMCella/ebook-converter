@@ -81,10 +81,6 @@ Note: removing a file from the Import screen's staging list does NOT delete from
 
 The "Output location" setting group in the Settings screen (Screen 5) is removed. The `outputLocation.defaultFolder` field is no longer used — all output goes to the per-book directory within managed storage. The "Open folder" button on the Converted screen (Screen 4) opens the `books/` directory in the OS file manager.
 
-### FR-5: Export EPUB
-
-Users can still save a copy of a converted EPUB to any location using the existing "Save as..." button on the Converted screen (Screen 4). This uses the Tauri native save dialog and copies the file from managed storage to the user-chosen location.
-
 ## Non-Functional Requirements
 
 ### NFR-1: Copy Performance

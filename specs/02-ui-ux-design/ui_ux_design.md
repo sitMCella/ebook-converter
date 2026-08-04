@@ -438,7 +438,6 @@ Mirrors the Library screen (screen 2) layout for consistency, but shows EPUB-spe
 │  │                       │  ▸ Table of contents      ││
 │  │                       │                          ││
 │  │                       │  [Open in reader]        ││
-│  │                       │  [Save as...]            ││
 │  │                       │  [Reconvert]             ││
 │  └───────────────────────┴──────────────────────────┘│
 └──────────────────────────────────────────────────────┘
@@ -492,8 +491,7 @@ Mirrors the Library screen (screen 2) layout for consistency, but shows EPUB-spe
 Stacked vertically, full width:
 
 1. **"Open in reader"** — primary button, `external-link` icon. Opens the EPUB file in the system's default EPUB reader application.
-2. **"Save as..."** — secondary button, `download` icon. Opens a Tauri native save dialog so the user can save a copy to a different location.
-3. **"Reconvert"** — secondary button, `refresh` icon. Returns to the Library screen with this document's source PDF selected and the conversion options panel expanded. Allows the user to adjust settings and re-run the conversion.
+2. **"Reconvert"** — secondary button, `refresh` icon. Returns to the Library screen with this document's source PDF selected and the conversion options panel expanded. Allows the user to adjust settings and re-run the conversion.
 
 ### Interactions
 
@@ -503,7 +501,6 @@ Stacked vertically, full width:
 | Click chapter navigation arrows | Preview updates to the next/previous chapter. |
 | Click TOC entry | Preview jumps to that chapter. |
 | Click "Open in reader" | OS launches the default EPUB reader with this file. |
-| Click "Save as..." | Tauri save dialog opens with the EPUB file name pre-filled. |
 | Click "Reconvert" | Navigate to Library screen; source PDF selected; conversion options expanded. |
 
 ---
