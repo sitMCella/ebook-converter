@@ -182,7 +182,7 @@ const SHELL_PLUGIN = '@tauri-apps/' + 'plugin-shell';
 async function openFileWithSystem(path) {
   if (isTauri) {
     try {
-      const mod = await import(SHELL_PLUGIN);
+      const mod = await import(/* @vite-ignore */ SHELL_PLUGIN);
       return mod.open(path);
     } catch {
       // shell plugin not installed
@@ -193,7 +193,7 @@ async function openFileWithSystem(path) {
 async function openFolder(path) {
   if (isTauri) {
     try {
-      const mod = await import(SHELL_PLUGIN);
+      const mod = await import(/* @vite-ignore */ SHELL_PLUGIN);
       return mod.open(path);
     } catch {
       // shell plugin not installed

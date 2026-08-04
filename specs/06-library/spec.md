@@ -17,7 +17,6 @@ The Import list already links to the Library screen (clicking a file name naviga
 A scrollable list panel (260 px wide) on the left side of the screen shows all imported PDFs. Each item displays:
 - File name (truncated with ellipsis if needed).
 - File size (muted, 12 px).
-- Status badge (same colours as the import list: Ready, Converting, Converted, Error).
 
 Clicking a document selects it and populates the detail panel on the right.
 
@@ -61,9 +60,11 @@ Each setting shows the global default value with "(default)" label. When changed
 
 The collapsed header shows an override count when overrides exist: "Conversion options · N custom".
 
-### FR-6: Detail Panel — Convert Button
+### FR-6: Detail Panel — Action Buttons
 
-A full-width primary button "Convert to EPUB" below the conversion options. Disabled when the document is already Converting. Changes to "Reconvert to EPUB" (secondary style) when already Converted.
+A full-width primary button "Convert to EPUB" below the conversion options. Disabled when the document is already Converting. When the document is already Converted, two buttons appear:
+- "View EPUB" (primary) — navigates to the Converted screen with the corresponding EPUB selected.
+- "Reconvert to EPUB" (secondary) — starts a new conversion.
 
 ### FR-7: Empty State
 

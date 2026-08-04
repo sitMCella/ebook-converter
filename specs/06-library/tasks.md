@@ -29,7 +29,7 @@
 
 ### T3: Create Document List
 - [ ] Create `src/components/library/DocumentList.jsx` (260px fixed width, scrollable)
-- [ ] Create `src/components/library/DocumentListItem.jsx` with name, size, status badge
+- [ ] Create `src/components/library/DocumentListItem.jsx` with name and size
 - [ ] Implement selected state styling (accent background, bold text)
 - [ ] Implement hover state styling
 

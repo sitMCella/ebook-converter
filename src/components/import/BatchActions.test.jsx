@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -25,20 +25,28 @@ vi.mock('../../lib/tauri', async () => {
   };
 });
 
-vi.mock('../../lib/settings', () => ({
-  loadSettings: vi.fn().mockResolvedValue({}),
-  settingsToConversionOptions: vi.fn().mockReturnValue({}),
-}));
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+    settingsToConversionOptions: vi.fn().mockReturnValue({}),
+  };
+});
 
 import { deleteBook } from '../../lib/tauri';
+import { SettingsProvider } from '../../contexts/SettingsContext';
 
 function Wrapper({ children }) {
   return (
-    <ImportProvider>
-      <ConversionProvider>
-        <MemoryRouter>{children}</MemoryRouter>
-      </ConversionProvider>
-    </ImportProvider>
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter>{children}</MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>
   );
 }
 
@@ -60,26 +68,28 @@ beforeEach(() => {
 });
 
 describe('BatchActions', () => {
-  it('disables "Remove selected" when no rows are selected', () => {
+  it('disables "Remove selected" when no rows are selected', async () => {
     render(
       <Wrapper>
         <BatchActions />
       </Wrapper>
     );
+    await act(async () => {});
     expect(screen.getByText('Remove selected').closest('button')).toBeDisabled();
   });
 
-  it('disables "Convert selected" when no convertible rows are selected', () => {
+  it('disables "Convert selected" when no convertible rows are selected', async () => {
     render(
       <Wrapper>
         <BatchActions />
       </Wrapper>
     );
+    await act(async () => {});
     const convertBtn = screen.getByText('Convert selected').closest('button');
     expect(convertBtn).toBeDisabled();
   });
 
-  it('enables "Remove selected" when rows are selected', () => {
+  it('enables "Remove selected" when rows are selected', async () => {
     render(
       <Wrapper>
         <SeedState
@@ -90,10 +100,11 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     expect(screen.getByText('Remove selected').closest('button')).not.toBeDisabled();
   });
 
-  it('enables "Convert selected" when ready rows are selected', () => {
+  it('enables "Convert selected" when ready rows are selected', async () => {
     render(
       <Wrapper>
         <SeedState
@@ -104,11 +115,12 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     const convertBtn = screen.getByText('Convert selected').closest('button');
     expect(convertBtn).not.toBeDisabled();
   });
 
-  it('keeps "Convert selected" disabled when only error files are selected', () => {
+  it('keeps "Convert selected" disabled when only error files are selected', async () => {
     render(
       <Wrapper>
         <SeedState
@@ -119,6 +131,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     const convertBtn = screen.getByText('Convert selected').closest('button');
     expect(convertBtn).toBeDisabled();
   });
@@ -135,6 +148,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Remove selected'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText(/Remove 1 file\(s\)/)).toBeInTheDocument();
@@ -152,6 +166,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Remove selected'));
     await user.click(screen.getByText('Confirm'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -169,6 +184,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Convert selected').closest('button'));
     expect(mockNavigate).toHaveBeenCalledWith('/converting');
   });
@@ -185,6 +201,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Remove selected'));
     await user.click(screen.getByText('Confirm'));
     expect(deleteBook).toHaveBeenCalledWith('uuid-123');
@@ -202,6 +219,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Remove selected'));
     await user.click(screen.getByText('Confirm'));
     expect(deleteBook).not.toHaveBeenCalled();
@@ -221,6 +239,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Remove selected'));
     await user.click(screen.getByText('Confirm'));
     expect(deleteBook).toHaveBeenCalledWith('uuid-123');
@@ -240,6 +259,7 @@ describe('BatchActions', () => {
         </SeedState>
       </Wrapper>
     );
+    await act(async () => {});
     await user.click(screen.getByText('Remove selected'));
     expect(screen.getByText(/delete the stored copies/)).toBeInTheDocument();
   });

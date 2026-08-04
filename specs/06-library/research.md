@@ -13,7 +13,7 @@
 | Book metadata persistence | `save_book_metadata` / `list_books` commands | Write/read `metadata.json` per book directory |
 | Settings system | `src/lib/settings.js` | `DEFAULT_SETTINGS`, `loadSettings()`, `getEffectiveSettings()`, `mergeSettings()` |
 | Conversion pipeline | `useConversion` hook | Queue management, progress tracking, result handling |
-| UI components | `Button`, `StatusBadge`, `ConfirmDialog`, `Checkbox` | Reusable across screens |
+| UI components | `Button`, `ConfirmDialog`, `Checkbox` | Reusable across screens |
 | Format utilities | `src/lib/format.js` | `formatFileSize()` |
 
 ### What's Missing

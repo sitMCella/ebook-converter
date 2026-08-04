@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
@@ -14,10 +14,15 @@ vi.mock('../../lib/tauri', () => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../../lib/settings', () => ({
-  loadSettings: vi.fn().mockResolvedValue({}),
-  settingsToConversionOptions: vi.fn().mockReturnValue({}),
-}));
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+    settingsToConversionOptions: vi.fn().mockReturnValue({}),
+  };
+});
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -43,13 +48,17 @@ function SeedConversion({ files, paths, complete, children }) {
   return children;
 }
 
+import { SettingsProvider } from '../../contexts/SettingsContext';
+
 function Wrapper({ children }) {
   return (
-    <ImportProvider>
-      <ConversionProvider>
-        <MemoryRouter>{children}</MemoryRouter>
-      </ConversionProvider>
-    </ImportProvider>
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter>{children}</MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>
   );
 }
 
@@ -58,7 +67,7 @@ beforeEach(() => {
 });
 
 describe('ConvertingScreen', () => {
-  it('shows "Converting" heading when active', () => {
+  it('shows "Converting" heading when active', async () => {
     render(
       <Wrapper>
         <SeedConversion
@@ -69,10 +78,11 @@ describe('ConvertingScreen', () => {
         </SeedConversion>
       </Wrapper>,
     );
+    await act(async () => {});
     expect(screen.getByRole('heading', { name: 'Converting' })).toBeInTheDocument();
   });
 
-  it('shows "Cancel all" button when files are queued', () => {
+  it('shows "Cancel all" button when files are queued', async () => {
     render(
       <Wrapper>
         <SeedConversion
@@ -86,6 +96,7 @@ describe('ConvertingScreen', () => {
         </SeedConversion>
       </Wrapper>,
     );
+    await act(async () => {});
     expect(screen.getByText('Cancel all')).toBeInTheDocument();
   });
 
@@ -101,12 +112,13 @@ describe('ConvertingScreen', () => {
         </SeedConversion>
       </Wrapper>,
     );
+    await act(async () => {});
     await user.click(screen.getByText('Cancel all'));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText(/Cancel 1 remaining conversion/)).toBeInTheDocument();
   });
 
-  it('shows "Conversion complete" and "View converted" when done', () => {
+  it('shows "Conversion complete" and "View converted" when done', async () => {
     render(
       <Wrapper>
         <SeedConversion
@@ -118,6 +130,7 @@ describe('ConvertingScreen', () => {
         </SeedConversion>
       </Wrapper>,
     );
+    await act(async () => {});
     expect(screen.getByText('Conversion complete')).toBeInTheDocument();
     expect(screen.getByText('View converted')).toBeInTheDocument();
   });
@@ -135,11 +148,12 @@ describe('ConvertingScreen', () => {
         </SeedConversion>
       </Wrapper>,
     );
+    await act(async () => {});
     await user.click(screen.getByText('View converted'));
     expect(mockNavigate).toHaveBeenCalledWith('/converted');
   });
 
-  it('hides "Cancel all" when conversion is complete', () => {
+  it('hides "Cancel all" when conversion is complete', async () => {
     render(
       <Wrapper>
         <SeedConversion
@@ -151,6 +165,7 @@ describe('ConvertingScreen', () => {
         </SeedConversion>
       </Wrapper>,
     );
+    await act(async () => {});
     expect(screen.queryByText('Cancel all')).not.toBeInTheDocument();
   });
 });

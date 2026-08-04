@@ -42,7 +42,7 @@ export function ImportListRow({ file, selected, onToggleSelect }) {
             {formatFileSize(fileSize)}
           </span>
         )}
-        <StatusBadge status={file.status} />
+        {file.status === 'error' && <StatusBadge status="error" />}
       </div>
       {showError && file.errorMessage && (
         <div className="px-3.5 py-2 bg-[var(--bg-danger)] text-[var(--text-danger)] text-[12px] border-b border-[var(--border)]">

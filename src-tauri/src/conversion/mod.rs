@@ -55,16 +55,21 @@ pub struct OutputOptions {
     pub base_font_size: u8,
     pub line_height: f32,
     pub margins: f32,
+    pub text_alignment: String,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PageHandlingOptions {
     pub skip_blank_pages: bool,
     pub page_range: String,
     pub page_range_from: Option<u32>,
     pub page_range_to: Option<u32>,
     pub split_chapters_by: String,
+    pub keep_page_breaks: bool,
+    pub remove_page_numbers: bool,
+    pub cover_page: String,
 }
 
 #[derive(Serialize, Clone)]

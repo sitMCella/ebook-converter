@@ -8,13 +8,19 @@ pub fn generate_css(options: &OutputOptions) -> String {
         _ => "serif",
     };
 
+    let text_align = match options.text_alignment.as_str() {
+        "left" => "left",
+        "right" => "right",
+        _ => "justify",
+    };
+
     format!(
         r#"body {{
     font-family: {font_family};
     font-size: {font_size}pt;
     line-height: {line_height};
     margin: {margins}em;
-    text-align: justify;
+    text-align: {text_align};
     orphans: 2;
     widows: 2;
 }}
@@ -73,5 +79,6 @@ img {{
         font_size = options.base_font_size,
         line_height = options.line_height,
         margins = options.margins,
+        text_align = text_align,
     )
 }

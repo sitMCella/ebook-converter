@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { ChevronRight, ChevronDown, X } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
-import { DEFAULT_SETTINGS, loadSettings } from '../../lib/settings';
+import { useSettings } from '../../contexts/SettingsContext';
 
 const SPLIT_OPTIONS = [
   { value: 'heading1', label: 'Heading level 1' },
@@ -121,11 +121,7 @@ function NumberControl({
 export function ConversionOptions({ file }) {
   const { dispatch } = useImportContext();
   const [expanded, setExpanded] = useState(false);
-  const [globalSettings, setGlobalSettings] = useState(DEFAULT_SETTINGS);
-
-  useEffect(() => {
-    loadSettings().then(setGlobalSettings);
-  }, []);
+  const { settings: globalSettings } = useSettings();
 
   const overrides = file.overrides || {};
 

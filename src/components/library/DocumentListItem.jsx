@@ -20,7 +20,7 @@ export function DocumentListItem({ file, selected, onSelect }) {
         <span className="text-[13px] truncate text-[var(--text-primary)]">
           {file.name}
         </span>
-        <StatusBadge status={file.status} />
+        {file.status === 'error' && <StatusBadge status="error" />}
       </div>
       {fileSize > 0 && (
         <span className="text-[12px] text-[var(--text-muted)] mt-0.5 block">

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -8,8 +8,18 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+  };
+});
+
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionProvider } from '../../contexts/ConversionContext';
+import { SettingsProvider } from '../../contexts/SettingsContext';
 import { LibraryScreen } from './LibraryScreen';
 import { useEffect } from 'react';
 
@@ -75,31 +85,38 @@ function SeedFiles({ files, children }) {
   return children;
 }
 
-function renderLibrary({ files = testFiles, initialPath = '/library' } = {}) {
-  return render(
-    <ImportProvider>
-      <ConversionProvider>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <SeedFiles files={files}>
-            <LibraryScreen />
-          </SeedFiles>
-        </MemoryRouter>
-      </ConversionProvider>
-    </ImportProvider>,
+async function renderLibrary({ files = testFiles, initialPath = '/library' } = {}) {
+  const result = render(
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <SeedFiles files={files}>
+              <LibraryScreen />
+            </SeedFiles>
+          </MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>,
   );
+  await act(async () => {});
+  return result;
 }
 
 describe('LibraryScreen', () => {
-  it('shows empty state when no files are imported', () => {
+  it('shows empty state when no files are imported', async () => {
     render(
-      <ImportProvider>
-        <ConversionProvider>
-          <MemoryRouter>
-            <LibraryScreen />
-          </MemoryRouter>
-        </ConversionProvider>
-      </ImportProvider>,
+      <SettingsProvider>
+        <ImportProvider>
+          <ConversionProvider>
+            <MemoryRouter>
+              <LibraryScreen />
+            </MemoryRouter>
+          </ConversionProvider>
+        </ImportProvider>
+      </SettingsProvider>,
     );
+    await act(async () => {});
     expect(screen.getByText(/your library is empty/i)).toBeInTheDocument();
     expect(screen.getByText('Go to Import')).toBeInTheDocument();
   });
@@ -107,33 +124,36 @@ describe('LibraryScreen', () => {
   it('navigates to /import when "Go to Import" is clicked', async () => {
     const user = userEvent.setup();
     render(
-      <ImportProvider>
-        <ConversionProvider>
-          <MemoryRouter>
-            <LibraryScreen />
-          </MemoryRouter>
-        </ConversionProvider>
-      </ImportProvider>,
+      <SettingsProvider>
+        <ImportProvider>
+          <ConversionProvider>
+            <MemoryRouter>
+              <LibraryScreen />
+            </MemoryRouter>
+          </ConversionProvider>
+        </ImportProvider>
+      </SettingsProvider>,
     );
+    await act(async () => {});
     await user.click(screen.getByText('Go to Import'));
     expect(mockNavigate).toHaveBeenCalledWith('/import');
   });
 
-  it('renders document list with all imported files', () => {
-    renderLibrary();
+  it('renders document list with all imported files', async () => {
+    await renderLibrary();
     expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
     expect(screen.getByText('Clean architecture.pdf')).toBeInTheDocument();
     expect(screen.getByText('Pragmatic programmer.pdf')).toBeInTheDocument();
   });
 
-  it('renders header with title and search input', () => {
-    renderLibrary();
+  it('renders header with title and search input', async () => {
+    await renderLibrary();
     expect(screen.getByText('Library')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search documents...')).toBeInTheDocument();
   });
 
-  it('auto-selects the first document and shows its metadata', () => {
-    renderLibrary();
+  it('auto-selects the first document and shows its metadata', async () => {
+    await renderLibrary();
     expect(screen.getByText('Design Patterns')).toBeInTheDocument();
     expect(screen.getByText('Gamma, Helm, Johnson, Vlissides')).toBeInTheDocument();
     expect(screen.getByText('384')).toBeInTheDocument();
@@ -141,7 +161,7 @@ describe('LibraryScreen', () => {
 
   it('switches detail panel when a different document is clicked', async () => {
     const user = userEvent.setup();
-    renderLibrary();
+    await renderLibrary();
 
     const listbox = screen.getByRole('listbox');
     const secondItem = within(listbox).getByText('Clean architecture.pdf');
@@ -153,7 +173,7 @@ describe('LibraryScreen', () => {
 
   it('filters document list by search query', async () => {
     const user = userEvent.setup();
-    renderLibrary();
+    await renderLibrary();
 
     const searchInput = screen.getByPlaceholderText('Search documents...');
     await user.type(searchInput, 'clean');
@@ -165,7 +185,7 @@ describe('LibraryScreen', () => {
 
   it('shows "No documents match" when search has no results', async () => {
     const user = userEvent.setup();
-    renderLibrary();
+    await renderLibrary();
 
     const searchInput = screen.getByPlaceholderText('Search documents...');
     await user.type(searchInput, 'nonexistent');
@@ -173,19 +193,25 @@ describe('LibraryScreen', () => {
     expect(screen.getByText(/no documents match/i)).toBeInTheDocument();
   });
 
-  it('shows status badges for each document', () => {
-    renderLibrary();
-    const badges = screen.getAllByText(/Ready|Converted/);
-    expect(badges.length).toBeGreaterThanOrEqual(3);
+  it('shows error badge only for error documents', async () => {
+    await renderLibrary({
+      files: [
+        { path: '/a.pdf', name: 'a.pdf', size: 1024, status: 'ready', metadata: { fileSize: 1024 } },
+        { path: '/b.pdf', name: 'b.pdf', size: 1024, status: 'error', errorMessage: 'Corrupted', metadata: { fileSize: 1024 } },
+      ],
+    });
+    const badges = screen.getAllByText('Error');
+    expect(badges).toHaveLength(1);
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument();
   });
 
-  it('shows page preview placeholder', () => {
-    renderLibrary();
+  it('shows page preview placeholder', async () => {
+    await renderLibrary();
     expect(screen.getByText(/page preview not yet available/i)).toBeInTheDocument();
   });
 
-  it('hides metadata rows when values are absent', () => {
-    renderLibrary({
+  it('hides metadata rows when values are absent', async () => {
+    await renderLibrary({
       files: [
         {
           path: '/docs/no-meta.pdf',
@@ -201,18 +227,46 @@ describe('LibraryScreen', () => {
     expect(screen.getByText('10')).toBeInTheDocument();
   });
 
-  it('shows "Convert to EPUB" button for ready documents', () => {
-    renderLibrary();
+  it('shows "Convert to EPUB" button for ready documents', async () => {
+    await renderLibrary();
     expect(screen.getByText('Convert to EPUB')).toBeInTheDocument();
   });
 
   it('shows "Reconvert to EPUB" for converted documents', async () => {
     const user = userEvent.setup();
-    renderLibrary();
+    await renderLibrary();
 
     const listbox = screen.getByRole('listbox');
     await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
 
     expect(screen.getByText('Reconvert to EPUB')).toBeInTheDocument();
+  });
+
+  it('shows "View EPUB" button for converted documents', async () => {
+    const user = userEvent.setup();
+    await renderLibrary();
+
+    const listbox = screen.getByRole('listbox');
+    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+
+    expect(screen.getByText('View EPUB')).toBeInTheDocument();
+  });
+
+  it('does not show "View EPUB" button for ready documents', async () => {
+    await renderLibrary();
+    expect(screen.queryByText('View EPUB')).not.toBeInTheDocument();
+  });
+
+  it('navigates to /converted when "View EPUB" is clicked', async () => {
+    const user = userEvent.setup();
+    await renderLibrary();
+
+    const listbox = screen.getByRole('listbox');
+    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+    await user.click(screen.getByText('View EPUB'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/converted', {
+      state: { selectedPath: '/docs/pragmatic-programmer.pdf' },
+    });
   });
 });

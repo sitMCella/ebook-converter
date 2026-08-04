@@ -99,9 +99,10 @@ test.describe('Storage location — PDF import creates book in managed storage',
     expect(uniqueIds.size).toBe(3);
   });
 
-  test('file shows Ready status after storage import', async ({ page }) => {
+  test('file appears in import list after storage import', async ({ page }) => {
     await importFile(page, 'ready-check.pdf');
-    await expect(page.locator('[aria-label="Status: Ready"]')).toBeVisible();
+    await expect(page.getByText('ready-check.pdf')).toBeVisible();
+    await expect(page.locator('[aria-label="Status: Ready"]')).not.toBeVisible();
   });
 });
 

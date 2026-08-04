@@ -40,9 +40,9 @@ describe('ImportListRow', () => {
     expect(screen.getByText('1 KB')).toBeInTheDocument();
   });
 
-  it('renders status badge', () => {
+  it('does not render status badge for non-error status', () => {
     renderRow();
-    expect(screen.getByText('Ready')).toBeInTheDocument();
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument();
   });
 
   it('renders error badge for error status', () => {
@@ -53,7 +53,7 @@ describe('ImportListRow', () => {
   it('shows error message when error row is clicked', async () => {
     const user = userEvent.setup();
     renderRow({ status: 'error', errorMessage: 'File corrupted' });
-    const row = screen.getByText('Error').closest('div[class*="flex items-center"]');
+    const row = screen.getByText('document.pdf').closest('div[class*="flex items-center"]');
     await user.click(row);
     expect(screen.getByText('File corrupted')).toBeInTheDocument();
   });
@@ -61,7 +61,7 @@ describe('ImportListRow', () => {
   it('toggles error message visibility on repeated clicks', async () => {
     const user = userEvent.setup();
     renderRow({ status: 'error', errorMessage: 'File corrupted' });
-    const row = screen.getByText('Error').closest('div[class*="flex items-center"]');
+    const row = screen.getByText('document.pdf').closest('div[class*="flex items-center"]');
     await user.click(row);
     expect(screen.getByText('File corrupted')).toBeInTheDocument();
     await user.click(row);

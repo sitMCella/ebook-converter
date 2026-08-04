@@ -137,6 +137,9 @@ mod tests {
             page_range_from: None,
             page_range_to: None,
             split_chapters_by: split_by.to_string(),
+            keep_page_breaks: false,
+            remove_page_numbers: true,
+            cover_page: "auto".to_string(),
         }
     }
 

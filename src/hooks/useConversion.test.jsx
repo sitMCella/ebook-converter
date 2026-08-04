@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ImportProvider, useImportContext } from '../contexts/ImportContext';
 import { ConversionProvider, useConversionContext } from '../contexts/ConversionContext';
+import { SettingsProvider } from '../contexts/SettingsContext';
 
 vi.mock('../lib/tauri', () => ({
   convertPdfToEpub: vi.fn(),
@@ -10,25 +11,33 @@ vi.mock('../lib/tauri', () => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../lib/settings', () => ({
-  loadSettings: vi.fn(),
-  settingsToConversionOptions: vi.fn(),
-}));
+vi.mock('../lib/settings', async () => {
+  const actual = await vi.importActual('../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn().mockResolvedValue({ ...actual.DEFAULT_SETTINGS }),
+    saveSettings: vi.fn().mockResolvedValue(undefined),
+    getEffectiveSettings: vi.fn((base, overrides) => actual.getEffectiveSettings(base, overrides)),
+    settingsToConversionOptions: vi.fn(),
+  };
+});
 
 import { useConversion } from './useConversion';
 import { convertPdfToEpub, cancelConversion, onConversionProgress } from '../lib/tauri';
-import { loadSettings, settingsToConversionOptions } from '../lib/settings';
+import { getEffectiveSettings, settingsToConversionOptions } from '../lib/settings';
 
 function wrapper({ children }) {
   return (
-    <ImportProvider>
-      <ConversionProvider>{children}</ConversionProvider>
-    </ImportProvider>
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>{children}</ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>
   );
 }
 
-function renderUseConversion() {
-  return renderHook(
+async function renderUseConversion() {
+  const result = renderHook(
     () => ({
       conversion: useConversion(),
       importCtx: useImportContext(),
@@ -36,6 +45,8 @@ function renderUseConversion() {
     }),
     { wrapper },
   );
+  await act(async () => {});
+  return result;
 }
 
 describe('useConversion', () => {
@@ -48,18 +59,17 @@ describe('useConversion', () => {
       progressCallback = cb;
       return Promise.resolve(() => {});
     });
-    loadSettings.mockResolvedValue({ structure: {}, images: {} });
     settingsToConversionOptions.mockReturnValue({ outputFolder: '/out' });
     convertPdfToEpub.mockResolvedValue({ outputPath: '/out/test.epub' });
   });
 
-  it('sets up progress listener on mount', () => {
-    renderUseConversion();
+  it('sets up progress listener on mount', async () => {
+    await renderUseConversion();
     expect(onConversionProgress).toHaveBeenCalledWith(expect.any(Function));
   });
 
   it('does nothing when startConversion is called with empty paths', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.conversion.startConversion([]);
@@ -69,7 +79,7 @@ describe('useConversion', () => {
   });
 
   it('does nothing when startConversion is called with null', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.conversion.startConversion(null);
@@ -79,7 +89,7 @@ describe('useConversion', () => {
   });
 
   it('enqueues files and sets status to converting', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -97,8 +107,8 @@ describe('useConversion', () => {
     expect(convertPdfToEpub).toHaveBeenCalledWith('/a.pdf', { outputFolder: '/out' });
   });
 
-  it('loads settings once for the batch', async () => {
-    const { result } = renderUseConversion();
+  it('uses same settings for all files in a batch', async () => {
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -114,13 +124,66 @@ describe('useConversion', () => {
       result.current.conversion.startConversion(['/a.pdf', '/b.pdf']);
     });
 
-    expect(loadSettings).toHaveBeenCalledTimes(1);
     expect(convertPdfToEpub).toHaveBeenCalledTimes(2);
+    expect(settingsToConversionOptions).toHaveBeenCalledTimes(2);
+    const firstCallSettings = settingsToConversionOptions.mock.calls[0][0];
+    const secondCallSettings = settingsToConversionOptions.mock.calls[1][0];
+    expect(firstCallSettings).toEqual(secondCallSettings);
+  });
+
+  it('applies per-document overrides when converting', async () => {
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'SET_DOCUMENT_OVERRIDES',
+        path: '/a.pdf',
+        overrides: { images: { imageQuality: 'high' } },
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(getEffectiveSettings).toHaveBeenCalledWith(
+      expect.anything(),
+      { images: { imageQuality: 'high' } },
+    );
+    const mergedSettings = settingsToConversionOptions.mock.calls[0][0];
+    expect(mergedSettings.images.imageQuality).toBe('high');
+  });
+
+  it('uses global settings for files without overrides', async () => {
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(getEffectiveSettings).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+    );
   });
 
   it('sets error status when conversion fails', async () => {
     convertPdfToEpub.mockRejectedValue(new Error('PDF too large'));
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -140,7 +203,7 @@ describe('useConversion', () => {
 
   it('uses fallback error message when error has no message', async () => {
     convertPdfToEpub.mockRejectedValue(null);
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -160,7 +223,7 @@ describe('useConversion', () => {
 
   it('uses toString when error has no message property', async () => {
     convertPdfToEpub.mockRejectedValue({ toString: () => 'custom error string' });
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -179,7 +242,7 @@ describe('useConversion', () => {
 
   it('stores output path on success', async () => {
     convertPdfToEpub.mockResolvedValue({ outputPath: '/out/result.epub' });
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -197,7 +260,7 @@ describe('useConversion', () => {
   });
 
   it('dispatches progress events to import context', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -226,7 +289,7 @@ describe('useConversion', () => {
   });
 
   it('adds log entries from progress events', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       progressCallback({
@@ -243,7 +306,7 @@ describe('useConversion', () => {
   });
 
   it('logs error-stage progress as error level', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       progressCallback({
@@ -258,7 +321,7 @@ describe('useConversion', () => {
   });
 
   it('cancelAll resets file statuses to ready', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -302,7 +365,7 @@ describe('useConversion', () => {
 
   it('cancelAll calls cancelConversion for active file', async () => {
     cancelConversion.mockResolvedValue(undefined);
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -327,7 +390,7 @@ describe('useConversion', () => {
 
   it('cancelAll handles cancelConversion failure gracefully', async () => {
     cancelConversion.mockRejectedValue(new Error('cancel failed'));
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.conversionCtx.dispatch({
@@ -344,7 +407,7 @@ describe('useConversion', () => {
   });
 
   it('passes bookId to settingsToConversionOptions', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -364,7 +427,7 @@ describe('useConversion', () => {
   });
 
   it('uses storedPdfPath for conversion when available', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -381,7 +444,7 @@ describe('useConversion', () => {
   });
 
   it('falls back to original path when storedPdfPath is absent', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     await act(async () => {
       result.current.importCtx.dispatch({
@@ -398,7 +461,7 @@ describe('useConversion', () => {
   });
 
   it('reports isConverting based on activeFile', async () => {
-    const { result } = renderUseConversion();
+    const { result } = await renderUseConversion();
 
     expect(result.current.conversion.isConverting).toBe(false);
 

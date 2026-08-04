@@ -1,6 +1,28 @@
 import { describe, it, expect } from 'vitest';
 import { mergeSettings, DEFAULT_SETTINGS, settingsToConversionOptions, getEffectiveSettings } from './settings';
 
+describe('DEFAULT_SETTINGS', () => {
+  it('has textAlignment in output group', () => {
+    expect(DEFAULT_SETTINGS.output.textAlignment).toBe('justify');
+  });
+
+  it('has keepPageBreaks in pageHandling group', () => {
+    expect(DEFAULT_SETTINGS.pageHandling.keepPageBreaks).toBe(false);
+  });
+
+  it('has removePageNumbers in pageHandling group', () => {
+    expect(DEFAULT_SETTINGS.pageHandling.removePageNumbers).toBe(true);
+  });
+
+  it('has coverPage in pageHandling group', () => {
+    expect(DEFAULT_SETTINGS.pageHandling.coverPage).toBe('auto');
+  });
+
+  it('does not have outputLocation', () => {
+    expect(DEFAULT_SETTINGS.outputLocation).toBeUndefined();
+  });
+});
+
 describe('mergeSettings', () => {
   it('returns base when no overrides', () => {
     const result = mergeSettings(DEFAULT_SETTINGS, {});
@@ -29,6 +51,22 @@ describe('mergeSettings', () => {
     const result = mergeSettings(DEFAULT_SETTINGS, null);
     expect(result.structure.detectHeadings).toBe(true);
   });
+
+  it('fills in missing new fields from old settings file', () => {
+    const oldSettings = {
+      structure: { detectHeadings: false },
+      output: { epubVersion: 'epub2' },
+      pageHandling: { skipBlankPages: false },
+    };
+    const result = mergeSettings(DEFAULT_SETTINGS, oldSettings);
+    expect(result.output.textAlignment).toBe('justify');
+    expect(result.pageHandling.keepPageBreaks).toBe(false);
+    expect(result.pageHandling.removePageNumbers).toBe(true);
+    expect(result.pageHandling.coverPage).toBe('auto');
+    expect(result.structure.detectHeadings).toBe(false);
+    expect(result.output.epubVersion).toBe('epub2');
+    expect(result.pageHandling.skipBlankPages).toBe(false);
+  });
 });
 
 describe('settingsToConversionOptions', () => {
@@ -46,21 +84,8 @@ describe('settingsToConversionOptions', () => {
     expect(result.outputFolder).toBe('~/Documents/Ebooks');
   });
 
-  it('uses outputLocation.defaultFolder from settings when no explicit folder', () => {
-    const settings = {
-      ...DEFAULT_SETTINGS,
-      outputLocation: { defaultFolder: '/custom/path' },
-    };
-    const result = settingsToConversionOptions(settings);
-    expect(result.outputFolder).toBe('/custom/path');
-  });
-
-  it('prefers explicit outputFolder over settings default', () => {
-    const settings = {
-      ...DEFAULT_SETTINGS,
-      outputLocation: { defaultFolder: '/custom/path' },
-    };
-    const result = settingsToConversionOptions(settings, { outputFolder: '/explicit' });
+  it('prefers explicit outputFolder over default', () => {
+    const result = settingsToConversionOptions(DEFAULT_SETTINGS, { outputFolder: '/explicit' });
     expect(result.outputFolder).toBe('/explicit');
   });
 
