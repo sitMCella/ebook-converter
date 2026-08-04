@@ -23,7 +23,7 @@ export function EpubDetailPanel({ file }) {
     <div className="p-5 flex flex-col gap-6">
       <EpubPreview file={file} />
       <EpubMetadata file={file} />
-      <TableOfContents />
+      <TableOfContents entries={file.conversionResult?.toc || []} />
 
       <div className="flex flex-col gap-2">
         {isTauri && (

@@ -231,7 +231,7 @@ describe('ConvertedScreen', () => {
     expect(screen.queryByText('Images')).not.toBeInTheDocument();
   });
 
-  it('shows table of contents placeholder', async () => {
+  it('shows table of contents empty state when no toc data', async () => {
     const user = userEvent.setup();
     renderConverted();
 
@@ -239,7 +239,7 @@ describe('ConvertedScreen', () => {
     expect(tocButton).toBeInTheDocument();
 
     await user.click(tocButton);
-    expect(screen.getByText(/table of contents not yet available/i)).toBeInTheDocument();
+    expect(screen.getByText(/no chapters detected/i)).toBeInTheDocument();
   });
 
   it('shows "Reconvert" button that navigates to library', async () => {

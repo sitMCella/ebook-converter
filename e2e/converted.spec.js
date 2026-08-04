@@ -54,6 +54,11 @@ function mockSuccessfulConversion(page) {
         fileSize: 1048576,
         chapters: 12,
         images: 5,
+        toc: [
+          { title: 'Introduction', level: 1 },
+          { title: 'Chapter 1', level: 1 },
+          { title: 'Chapter 2', level: 1 },
+        ],
       })`,
     );
     await route.fulfill({ body: modified, headers: response.headers() });
@@ -270,22 +275,25 @@ test.describe('Converted Screen — Table of Contents', () => {
     await importConvertAndNavigate(page, 'toc-test.pdf');
   });
 
-  test('shows Table of contents section collapsed', async ({ page }) => {
+  test('shows Table of contents section collapsed with entry count', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Table of contents' })).toBeVisible();
-    await expect(page.getByText('Table of contents not yet available.')).not.toBeVisible();
+    await expect(page.getByText('(3)')).toBeVisible();
+    await expect(page.getByText('Introduction')).not.toBeVisible();
   });
 
-  test('clicking expands Table of contents with placeholder', async ({ page }) => {
+  test('clicking expands Table of contents with chapter entries', async ({ page }) => {
     await page.getByRole('button', { name: 'Table of contents' }).click();
-    await expect(page.getByText('Table of contents not yet available.')).toBeVisible();
+    await expect(page.getByText('Introduction')).toBeVisible();
+    await expect(page.getByText('Chapter 1')).toBeVisible();
+    await expect(page.getByText('Chapter 2')).toBeVisible();
   });
 
   test('clicking again collapses Table of contents', async ({ page }) => {
     await page.getByRole('button', { name: 'Table of contents' }).click();
-    await expect(page.getByText('Table of contents not yet available.')).toBeVisible();
+    await expect(page.getByText('Introduction')).toBeVisible();
 
     await page.getByRole('button', { name: 'Table of contents' }).click();
-    await expect(page.getByText('Table of contents not yet available.')).not.toBeVisible();
+    await expect(page.getByText('Introduction')).not.toBeVisible();
   });
 });
 

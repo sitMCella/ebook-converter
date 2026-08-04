@@ -2,7 +2,7 @@ use super::chapter_splitter::Chapter;
 use super::css;
 use super::image_extractor::ExtractedImage;
 use super::structure_detector::StructuredContent;
-use super::{ConversionOptions, ConversionResult};
+use super::{ConversionOptions, ConversionResult, TocEntry};
 use crate::pdf::PdfMetadata;
 use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
 
@@ -87,11 +87,20 @@ pub fn generate_epub(
     std::fs::write(output_path, &output)
         .map_err(|e| format!("Failed to write EPUB file: {}", e))?;
 
+    let toc: Vec<TocEntry> = chapters
+        .iter()
+        .map(|c| TocEntry {
+            title: c.title.clone(),
+            level: 1,
+        })
+        .collect();
+
     Ok(ConversionResult {
         output_path: output_path.to_string(),
         chapters: chapters.len(),
         images: images.len(),
         file_size: output.len() as u64,
+        toc,
     })
 }
 
