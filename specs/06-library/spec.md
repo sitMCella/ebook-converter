@@ -17,7 +17,6 @@ The Import list already links to the Library screen (clicking a file name naviga
 A scrollable list panel (260 px wide) on the left side of the screen shows all imported PDFs. Each item displays:
 - File name (truncated with ellipsis if needed).
 - File size (muted, 12 px).
-- Status badge (same colours as the import list: Ready, Converting, Converted, Error).
 
 Clicking a document selects it and populates the detail panel on the right.
 

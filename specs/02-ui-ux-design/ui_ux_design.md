@@ -226,7 +226,6 @@ Below the import list, right-aligned:
 - Each item shows:
   - File name (truncated with ellipsis).
   - File size (muted, 12 px, below the name).
-  - Status badge (same colours as the import list).
 - **Selected state**: accent background, bold text.
 - **Hover state**: subtle background tint.
 - Clicking a document populates the detail panel on the right.
