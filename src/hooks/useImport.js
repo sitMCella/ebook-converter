@@ -94,6 +94,8 @@ export function useImport() {
 
       setIsProcessing(true);
 
+      let successCount = 0;
+
       await Promise.all(
         paths.map(async (path) => {
           const file = state.stagedFiles.get(path);
@@ -107,6 +109,7 @@ export function useImport() {
               bookId: stored.bookId,
               storedPdfPath: stored.storedPdfPath,
             });
+            successCount++;
 
             if (stored.bookId) {
               const name = path.split(/[\\/]/).pop();
@@ -139,6 +142,7 @@ export function useImport() {
       );
 
       setIsProcessing(false);
+      return successCount;
     },
     [state.stagedFiles, dispatch]
   );
