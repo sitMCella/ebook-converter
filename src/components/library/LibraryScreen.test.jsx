@@ -237,4 +237,32 @@ describe('LibraryScreen', () => {
 
     expect(screen.getByText('Reconvert to EPUB')).toBeInTheDocument();
   });
+
+  it('shows "View EPUB" button for converted documents', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+
+    const listbox = screen.getByRole('listbox');
+    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+
+    expect(screen.getByText('View EPUB')).toBeInTheDocument();
+  });
+
+  it('does not show "View EPUB" button for ready documents', () => {
+    renderLibrary();
+    expect(screen.queryByText('View EPUB')).not.toBeInTheDocument();
+  });
+
+  it('navigates to /converted when "View EPUB" is clicked', async () => {
+    const user = userEvent.setup();
+    renderLibrary();
+
+    const listbox = screen.getByRole('listbox');
+    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+    await user.click(screen.getByText('View EPUB'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/converted', {
+      state: { selectedPath: '/docs/pragmatic-programmer.pdf' },
+    });
+  });
 });

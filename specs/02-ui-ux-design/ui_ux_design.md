@@ -285,8 +285,10 @@ This section implements the per-document override model described below in the "
 
 - Below the conversion options section.
 - Full-width primary button: "Convert to EPUB" with a `transform` icon.
-- Disabled if the document status is already `Converting` or `Converted`.
-- If the document is already converted, the button text changes to "Reconvert to EPUB" and the button style changes to secondary.
+- Disabled if the document status is already `Converting`.
+- If the document is already converted:
+  - A primary "View EPUB" button with an `external-link` icon appears first. Clicking it navigates to the Converted screen (screen 4) with the corresponding EPUB selected.
+  - Below it, a secondary "Reconvert to EPUB" button with a `refresh` icon allows re-conversion.
 
 ### Interactions
 
@@ -298,6 +300,7 @@ This section implements the per-document override model described below in the "
 | Expand "Conversion options" | Override controls become visible. |
 | Change an override value | The override is saved immediately (no separate save button). A "(default)" label is removed and a reset button appears. |
 | Click reset on an override | The value reverts to the global default. |
+| Click "View EPUB" | Navigate to the Converted screen with the corresponding EPUB selected. Only visible when the document is already converted. |
 | Click "Convert to EPUB" | Conversion starts for this single document. User is navigated to the Converting screen. |
 
 ---

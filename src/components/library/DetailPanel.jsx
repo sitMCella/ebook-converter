@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ArrowRightLeft, RefreshCw } from 'lucide-react';
+import { ArrowRightLeft, RefreshCw, ExternalLink } from 'lucide-react';
 import { useConversion } from '../../hooks/useConversion';
 import { PagePreview } from './PagePreview';
 import { MetadataSection } from './MetadataSection';
@@ -23,6 +23,16 @@ export function DetailPanel({ file }) {
       <PagePreview file={file} />
       <MetadataSection file={file} />
       <ConversionOptions file={file} />
+
+      {isConverted && (
+        <Button
+          variant="primary"
+          onClick={() => navigate('/converted', { state: { selectedPath: file.path } })}
+        >
+          <ExternalLink size={16} />
+          View EPUB
+        </Button>
+      )}
 
       <Button
         variant={isConverted ? 'secondary' : 'primary'}
