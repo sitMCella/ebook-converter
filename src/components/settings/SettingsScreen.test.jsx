@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsScreen } from './SettingsScreen';
 import { SettingsProvider } from '../../contexts/SettingsContext';
@@ -163,5 +163,129 @@ describe('SettingsScreen', () => {
 
     await userEvent.click(extractToggle);
     expect(screen.getByDisplayValue('Medium')).not.toBeDisabled();
+  });
+
+  it('enabling WebP with EPUB 2 selected auto-upgrades to EPUB 3 and shows toast', async () => {
+    const { toast } = await import('sonner');
+    renderSettingsScreen();
+
+    const epubSelect = screen.getByDisplayValue('EPUB 3');
+    await userEvent.selectOptions(epubSelect, 'epub2');
+    expect(epubSelect).toHaveValue('epub2');
+
+    const webpToggle = screen.getByLabelText('Convert to WebP');
+    await userEvent.click(webpToggle);
+
+    expect(epubSelect).toHaveValue('epub3');
+    expect(webpToggle).toHaveAttribute('aria-checked', 'true');
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringContaining('WebP images require EPUB 3'),
+    );
+  });
+
+  it('switching to EPUB 2 with WebP enabled auto-disables WebP and shows toast', async () => {
+    const { toast } = await import('sonner');
+    renderSettingsScreen();
+
+    const webpToggle = screen.getByLabelText('Convert to WebP');
+    await userEvent.click(webpToggle);
+    expect(webpToggle).toHaveAttribute('aria-checked', 'true');
+
+    const epubSelect = screen.getByDisplayValue('EPUB 3');
+    await userEvent.selectOptions(epubSelect, 'epub2');
+
+    expect(webpToggle).toHaveAttribute('aria-checked', 'false');
+    expect(epubSelect).toHaveValue('epub2');
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringContaining('WebP images are not supported in EPUB 2'),
+    );
+  });
+
+  it('disabling detect headings with heading-based split shows advisory toast', async () => {
+    const { toast } = await import('sonner');
+    renderSettingsScreen();
+
+    const headingsToggle = screen.getByLabelText('Detect headings');
+    await userEvent.click(headingsToggle);
+
+    expect(headingsToggle).toHaveAttribute('aria-checked', 'false');
+    expect(toast.warning).toHaveBeenCalledWith(
+      expect.stringContaining('Chapter splitting by headings requires heading detection'),
+    );
+  });
+
+  it('save indicator appears briefly after changing a setting', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderSettingsScreen();
+
+    const toggle = screen.getByLabelText('Detect headings');
+    await userEvent.click(toggle);
+
+    await waitFor(() => {
+      expect(screen.getByText((_, el) =>
+        el?.getAttribute('class')?.includes('text-[var(--text-success)]') ?? false,
+      )).toBeInTheDocument();
+    });
+
+    act(() => { vi.advanceTimersByTime(2000); });
+
+    await waitFor(() => {
+      expect(screen.queryByText((_, el) =>
+        el?.getAttribute('class')?.includes('text-[var(--text-success)]') ?? false,
+      )).not.toBeInTheDocument();
+    });
+
+    vi.useRealTimers();
+  });
+
+  it('max image width input has correct constraints', () => {
+    renderSettingsScreen();
+    const maxWidthInput = screen.getByDisplayValue('800');
+    expect(maxWidthInput).toHaveAttribute('min', '200');
+    expect(maxWidthInput).toHaveAttribute('max', '2000');
+    expect(maxWidthInput).toHaveAttribute('step', '100');
+  });
+
+  it('heading level threshold input has correct constraints', () => {
+    renderSettingsScreen();
+    const thresholdInput = screen.getByDisplayValue('3');
+    expect(thresholdInput).toHaveAttribute('min', '1');
+    expect(thresholdInput).toHaveAttribute('max', '6');
+  });
+
+  it('renders all dropdown options for EPUB version', () => {
+    renderSettingsScreen();
+    const epubSelect = screen.getByDisplayValue('EPUB 3');
+    const options = epubSelect.querySelectorAll('option');
+    expect(options).toHaveLength(2);
+    expect(options[0]).toHaveTextContent('EPUB 2');
+    expect(options[1]).toHaveTextContent('EPUB 3');
+  });
+
+  it('renders all text alignment options', () => {
+    renderSettingsScreen();
+    const alignSelect = screen.getByDisplayValue('Justify');
+    const options = alignSelect.querySelectorAll('option');
+    expect(options).toHaveLength(3);
+    expect(options[0]).toHaveTextContent('Justify');
+    expect(options[1]).toHaveTextContent('Left');
+    expect(options[2]).toHaveTextContent('Right');
+  });
+
+  it('renders all cover page options', () => {
+    renderSettingsScreen();
+    const coverSelect = screen.getByDisplayValue('Auto-detect');
+    const options = coverSelect.querySelectorAll('option');
+    expect(options).toHaveLength(3);
+    expect(options[0]).toHaveTextContent('Auto-detect');
+    expect(options[1]).toHaveTextContent('First page');
+    expect(options[2]).toHaveTextContent('None');
+  });
+
+  it('renders unit labels for number inputs', () => {
+    renderSettingsScreen();
+    expect(screen.getByText('px')).toBeInTheDocument();
+    expect(screen.getByText('pt')).toBeInTheDocument();
+    expect(screen.getByText('em')).toBeInTheDocument();
   });
 });
