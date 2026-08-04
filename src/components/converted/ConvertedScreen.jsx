@@ -2,17 +2,10 @@ import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, FolderOpen, Upload } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
-import { openFolder, isTauri } from '../../lib/tauri';
+import { openFolder, getBooksDir, isTauri } from '../../lib/tauri';
 import { EpubList } from './EpubList';
 import { EpubDetailPanel } from './EpubDetailPanel';
 import { Button } from '../ui/Button';
-
-function getOutputFolder(file) {
-  if (!file.outputPath) return null;
-  const parts = file.outputPath.split(/[\\/]/);
-  parts.pop();
-  return parts.join('/');
-}
 
 function getEpubName(file) {
   if (file.outputPath) {
@@ -54,12 +47,9 @@ export function ConvertedScreen() {
   }, [selectedFile, filteredFiles]);
 
   const handleOpenFolder = async () => {
-    const first = convertedFiles[0];
-    if (first) {
-      const folder = getOutputFolder(first);
-      if (folder) {
-        await openFolder(folder);
-      }
+    const booksDir = await getBooksDir();
+    if (booksDir) {
+      await openFolder(booksDir);
     }
   };
 

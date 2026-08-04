@@ -78,12 +78,12 @@
 - [x] Test pre-selection from React Router location state (via EPUB name derivation)
 
 ### T9: E2E Tests
-- [ ] Test navigating from Converting to Converted pre-selects the EPUB
-- [ ] Test selecting different EPUBs updates the detail panel
-- [ ] Test search filters the EPUB list
-- [ ] Test empty state shown when no conversions exist
-- [ ] Test "Go to Import" button in empty state navigates correctly
-- [ ] Test sidebar navigation to Converted screen
+- [x] Test navigating from Converting to Converted pre-selects the EPUB
+- [x] Test selecting different EPUBs updates the detail panel
+- [x] Test search filters the EPUB list
+- [x] Test empty state shown when no conversions exist
+- [x] Test "Go to Import" button in empty state navigates correctly
+- [x] Test sidebar navigation to Converted screen
 
 ## Acceptance Criteria
 
