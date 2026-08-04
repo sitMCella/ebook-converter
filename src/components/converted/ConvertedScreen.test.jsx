@@ -260,6 +260,11 @@ describe('ConvertedScreen', () => {
     expect(within(listbox).getByText('Design patterns.epub')).toBeInTheDocument();
   });
 
+  it('hides "Open folder" button in browser mode', () => {
+    renderConverted();
+    expect(screen.queryByText('Open folder')).not.toBeInTheDocument();
+  });
+
   it('shows EPUB file size in list items', () => {
     renderConverted();
     const listbox = screen.getByRole('listbox');
