@@ -6,7 +6,6 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../../lib/tauri', async (importOriginal) => ({
   ...(await importOriginal()),
   openFileWithSystem: vi.fn(),
-  saveFile: vi.fn(),
   isTauri: true,
 }));
 
@@ -44,11 +43,6 @@ describe('EpubDetailPanel (Tauri mode)', () => {
   it('shows "Open in reader" button when isTauri is true', () => {
     renderPanel();
     expect(screen.getByText('Open in reader')).toBeInTheDocument();
-  });
-
-  it('shows "Save as..." button when isTauri is true', () => {
-    renderPanel();
-    expect(screen.getByText('Save as...')).toBeInTheDocument();
   });
 
   it('calls openFileWithSystem with outputPath on "Open in reader" click', async () => {
