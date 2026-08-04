@@ -83,6 +83,7 @@ export function useConversion() {
               chapters: result.chapters,
               images: result.images,
               epubFileSize: result.fileSize,
+              toc: result.toc || [],
             });
           } catch {
             // metadata persistence is best-effort

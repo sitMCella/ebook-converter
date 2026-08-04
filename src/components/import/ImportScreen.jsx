@@ -1,5 +1,6 @@
-import { useEffect, useCallback } from 'react';
-import { FolderOpen } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FolderOpen, Library, ArrowRight } from 'lucide-react';
 import { openPdfFiles } from '../../lib/tauri';
 import { useImport } from '../../hooks/useImport';
 import { useDragDrop } from '../../hooks/useDragDrop';
@@ -10,13 +11,27 @@ import { Button } from '../ui/Button';
 
 export function ImportScreen() {
   const { stageFiles } = useImport();
+  const navigate = useNavigate();
+  const [importedCount, setImportedCount] = useState(0);
+
+  const handleStageFiles = useCallback(
+    (paths) => {
+      stageFiles(paths);
+      setImportedCount(0);
+    },
+    [stageFiles]
+  );
 
   const handleBrowse = useCallback(async () => {
     const paths = await openPdfFiles();
-    if (paths) stageFiles(paths);
-  }, [stageFiles]);
+    if (paths) handleStageFiles(paths);
+  }, [handleStageFiles]);
 
-  useDragDrop(stageFiles);
+  const handleImportComplete = useCallback((count) => {
+    setImportedCount((prev) => prev + count);
+  }, []);
+
+  useDragDrop(handleStageFiles);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -39,13 +54,33 @@ export function ImportScreen() {
         </Button>
       </div>
 
-      <DropZone onFilesSelected={stageFiles} />
+      <DropZone onFilesSelected={handleStageFiles} />
 
       <div className="mt-6">
         <ImportList />
       </div>
 
-      <BatchActions />
+      {importedCount > 0 && (
+        <div className="flex items-center justify-between mt-4 px-4 py-3 rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface-1)]">
+          <div className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]">
+            <Library size={16} className="text-[var(--fill-accent)]" />
+            <span>
+              {importedCount} {importedCount === 1 ? 'file' : 'files'} imported
+              to library
+            </span>
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 text-[13px] font-medium text-[var(--fill-accent)] hover:opacity-80 transition-opacity cursor-pointer"
+            onClick={() => navigate('/library')}
+          >
+            View in Library
+            <ArrowRight size={14} />
+          </button>
+        </div>
+      )}
+
+      <BatchActions onImportComplete={handleImportComplete} />
     </div>
   );
 }

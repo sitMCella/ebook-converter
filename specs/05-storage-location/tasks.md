@@ -115,7 +115,6 @@
 - [ ] Removing a file from the import list deletes the book directory
 - [ ] The Settings screen no longer shows "Output location"
 - [ ] The "Open folder" button on the Converted screen opens the `books/` directory
-- [ ] The "Save as..." button on the Converted screen copies the EPUB from managed storage to a user-chosen location
 - [ ] All existing unit tests pass
 - [ ] All existing e2e tests pass
 - [ ] Book IDs are validated as UUID v4 before constructing paths

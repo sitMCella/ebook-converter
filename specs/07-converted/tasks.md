@@ -28,7 +28,6 @@
 
 ### T4: Action Buttons
 - [x] Add "Open in reader" primary button with ExternalLink icon
-- [x] Add "Save as..." secondary button with Download icon
 - [x] Add "Reconvert" secondary button with RefreshCw icon
 - [x] Wire "Reconvert" to navigate to `/library` with source file path in route state
 
@@ -40,7 +39,6 @@
 - [x] Both return no-op in browser mode
 - [x] Wire "Open in reader" button to `openFileWithSystem()`
 - [x] Wire "Open folder" header button to `openFolder()`
-- [x] Wire "Save as..." button to existing `saveFile()` (read EPUB bytes from disk first)
 
 ### T6: Shell Plugin Setup
 - [x] Install `@tauri-apps/plugin-shell` (npm) and `tauri-plugin-shell` (Cargo)
@@ -92,7 +90,7 @@
 - [x] Clicking an EPUB shows its metadata in the detail panel
 - [x] Search filters the EPUB list by name in real time
 - [x] Empty state shown when no files are converted, with a working "Go to Import" link
-- [x] Action buttons (Open in reader, Save as, Reconvert) render correctly
+- [x] Action buttons (Open in reader, Reconvert) render correctly
 - [x] "Reconvert" navigates to Library with the source PDF selected
 - [x] EPUB preview shows a placeholder with chapter count
 - [x] Design matches Library screen patterns (spacing, typography, colours)

@@ -103,7 +103,36 @@ fn is_heading(line: &str, lines: &[&str], idx: usize, _max_level: u8) -> bool {
         return false;
     }
 
+    if looks_like_noise(line) {
+        return false;
+    }
+
     is_uppercase(line) || is_title_case(line)
+}
+
+fn looks_like_noise(line: &str) -> bool {
+    let alpha_count = line.chars().filter(|c| c.is_alphabetic()).count();
+    if alpha_count <= 1 {
+        return true;
+    }
+
+    if line.contains('=') || line.contains(';') || line.contains('$')
+        || line.contains('{') || line.contains('}') || line.contains('_')
+    {
+        return true;
+    }
+
+    let upper = line.to_uppercase();
+    if upper.starts_with("ISBN") {
+        return true;
+    }
+
+    let word_count = line.split_whitespace().count();
+    if word_count == 1 && alpha_count <= 3 {
+        return true;
+    }
+
+    false
 }
 
 fn detect_heading_level(line: &str) -> u8 {
@@ -287,5 +316,53 @@ mod tests {
 
         let has_break = result.iter().any(|c| matches!(c, StructuredContent::PageBreak));
         assert!(has_break);
+    }
+
+    #[test]
+    fn rejects_single_letter_as_heading() {
+        let pages = vec!["\nA\n\nSome text.".to_string()];
+        let result = detect_structure(&pages, &default_options());
+        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+        assert!(!has_heading);
+    }
+
+    #[test]
+    fn rejects_short_code_as_heading() {
+        let pages = vec!["\nLB\n\nSome text.".to_string()];
+        let result = detect_structure(&pages, &default_options());
+        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+        assert!(!has_heading);
+    }
+
+    #[test]
+    fn rejects_lines_with_code_characters() {
+        for line in &[
+            "VAGRANTFILE_API_VERSION = \"2\"",
+            "$ANSIBLE_VAULT;1.1;AES256",
+            "DOWNLOAD_WORDPRESS",
+        ] {
+            let pages = vec![format!("\n{}\n\nText.", line)];
+            let result = detect_structure(&pages, &default_options());
+            let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+            assert!(!has_heading, "should not detect '{}' as heading", line);
+        }
+    }
+
+    #[test]
+    fn rejects_isbn_as_heading() {
+        let pages = vec!["\nISBN 978-1-78439-829-3\n\nText.".to_string()];
+        let result = detect_structure(&pages, &default_options());
+        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+        assert!(!has_heading);
+    }
+
+    #[test]
+    fn accepts_real_chapter_headings() {
+        for title in &["INTRODUCTION", "CHAPTER ONE", "GETTING STARTED", "Part Two"] {
+            let pages = vec![format!("\n{}\n\nText.", title)];
+            let result = detect_structure(&pages, &default_options());
+            let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+            assert!(has_heading, "should detect '{}' as heading", title);
+        }
     }
 }

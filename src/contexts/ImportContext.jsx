@@ -204,6 +204,7 @@ function importReducer(state, action) {
               chapters: book.chapters || 0,
               images: book.images || 0,
               fileSize: book.epubFileSize || 0,
+              toc: book.toc || [],
             };
           }
           newFiles.set(path, fileData);

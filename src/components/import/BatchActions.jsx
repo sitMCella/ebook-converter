@@ -3,7 +3,7 @@ import { useImportContext } from '../../contexts/ImportContext';
 import { useImport } from '../../hooks/useImport';
 import { Button } from '../ui/Button';
 
-export function BatchActions() {
+export function BatchActions({ onImportComplete }) {
   const { state, dispatch } = useImportContext();
   const { importStagedFiles, isProcessing } = useImport();
 
@@ -18,9 +18,10 @@ export function BatchActions() {
     dispatch({ type: 'UNSTAGE_FILES', paths });
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (readyPaths.length === 0) return;
-    importStagedFiles(readyPaths);
+    const count = await importStagedFiles(readyPaths);
+    if (count > 0) onImportComplete?.(count);
   };
 
   return (
