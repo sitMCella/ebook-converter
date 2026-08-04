@@ -90,9 +90,35 @@ struct PdfMetadata {
 
 ## Frontend Interfaces
 
+### `StagedFile`
+
+Represents a single file in the staging list, waiting to be imported to the library.
+
+```typescript
+interface StagedFile {
+  /** Absolute filesystem path — used as the unique key */
+  path: string;
+
+  /** Display name (filename without directory) */
+  name: string;
+
+  /** File size in bytes */
+  size: number;
+
+  /** Current status in the staging pipeline */
+  status: "ready" | "error";
+
+  /** Error message (only when status is "error") */
+  errorMessage?: string;
+
+  /** Extracted PDF metadata (null while loading or on error) */
+  metadata: PdfMetadata | null;
+}
+```
+
 ### `ImportedFile`
 
-Represents a single file in the import list.
+Represents a file that has been imported to the library (persisted in managed storage).
 
 ```typescript
 interface ImportedFile {
@@ -113,6 +139,12 @@ interface ImportedFile {
 
   /** Extracted PDF metadata (null while loading or on error) */
   metadata: PdfMetadata | null;
+
+  /** UUID assigned during import to library */
+  bookId: string | null;
+
+  /** Path to the stored PDF copy in managed storage */
+  storedPdfPath: string | null;
 }
 ```
 
@@ -120,7 +152,10 @@ interface ImportedFile {
 
 ```typescript
 interface ImportState {
-  /** All imported files, keyed by absolute path */
+  /** Files staged for import (not yet in library), keyed by path */
+  stagedFiles: Map<string, StagedFile>;
+
+  /** Library files (imported and persisted), keyed by path */
   files: Map<string, ImportedFile>;
 
   /** Set of paths currently checked in the UI */
@@ -134,10 +169,19 @@ Reducer actions for `ImportContext`:
 
 ```typescript
 type ImportAction =
+  // Staging actions
+  | { type: "STAGE_FILES"; files: StagedFile[] }
+  | { type: "UNSTAGE_FILES"; paths: string[] }
+  | { type: "UPDATE_STAGED_STATUS"; path: string; status: StagedFile["status"]; errorMessage?: string }
+  | { type: "SET_STAGED_METADATA"; path: string; metadata: PdfMetadata }
+  // Library actions
+  | { type: "IMPORT_TO_LIBRARY"; path: string; bookId: string; storedPdfPath: string }
   | { type: "ADD_FILES"; files: ImportedFile[] }
   | { type: "REMOVE_FILES"; paths: string[] }
   | { type: "UPDATE_STATUS"; path: string; status: ImportedFile["status"]; errorMessage?: string }
   | { type: "SET_METADATA"; path: string; metadata: PdfMetadata }
+  | { type: "LOAD_LIBRARY"; books: BookMetadata[] }
+  // Selection actions (operate on staged files)
   | { type: "TOGGLE_SELECTION"; path: string }
   | { type: "SELECT_ALL" }
   | { type: "DESELECT_ALL" };
@@ -170,6 +214,16 @@ async function getPdfMetadata(path: string): Promise<PdfMetadata>;
  * Gets the file size in bytes via the filesystem plugin.
  */
 async function getFileSize(path: string): Promise<number>;
+
+/**
+ * Copies a PDF to managed storage and returns the book ID and stored path.
+ */
+async function importPdf(sourcePath: string): Promise<{ bookId: string; storedPdfPath: string }>;
+
+/**
+ * Saves book metadata to a JSON file in the book's storage directory.
+ */
+async function saveBookMetadata(metadata: BookMetadata): Promise<void>;
 ```
 
 ---

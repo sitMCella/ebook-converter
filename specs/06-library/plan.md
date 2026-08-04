@@ -4,6 +4,8 @@
 
 The Library screen consumes `ImportContext` state and persists book metadata to disk so the library survives app restarts. Two backend commands (`save_book_metadata`, `list_books`) handle persistence, and the `ImportProvider` loads persisted books on mount.
 
+The library reads from `state.files` — the library Map that is separate from `state.stagedFiles` (the staging area). Files enter the library via the `IMPORT_TO_LIBRARY` action (triggered by "Import to library" on the Import screen) or via `LOAD_LIBRARY` on startup.
+
 ```
 ┌──────────────────────────────────────────────────────┐
 │  LibraryScreen                                       │
@@ -25,13 +27,15 @@ The Library screen consumes `ImportContext` state and persists book metadata to 
 
 ## Key Decisions
 
-### D1: State Source — ImportContext with Persistence
+### D1: State Source — ImportContext with Staging/Library Separation
 
-The Library reads from the same `ImportContext` that the Import screen uses. No separate "library state" is needed since imported files _are_ the library. The file Map already contains metadata, status, and storage info. On startup, persisted book metadata is loaded from disk via the `list_books` Rust command and dispatched as a `LOAD_LIBRARY` action.
+The Library reads from the `files` Map in `ImportContext` — the same Map that persists across app restarts. This is distinct from the `stagedFiles` Map used by the Import screen. No separate "library state" is needed since the `files` Map already contains metadata, status, storage info, and per-document overrides.
+
+On startup, persisted book metadata is loaded from disk via the `list_books` Rust command and dispatched as a `LOAD_LIBRARY` action into the `files` Map.
 
 ### D2: Per-Document Overrides — Stored in ImportContext
 
-Per-document conversion overrides are added as an `overrides` field on the file object in the ImportContext. A new `SET_DOCUMENT_OVERRIDES` reducer action stores partial settings that merge on top of global defaults at conversion time. This aligns with the `getEffectiveSettings()` function already in `src/lib/settings.js`.
+Per-document conversion overrides are added as an `overrides` field on the file object in the ImportContext `files` Map. A new `SET_DOCUMENT_OVERRIDES` reducer action stores partial settings that merge on top of global defaults at conversion time. This aligns with the `getEffectiveSettings()` function already in `src/lib/settings.js`.
 
 ### D3: Selection — Component State
 
@@ -41,7 +45,11 @@ The selected document path is component-local state in LibraryScreen, initialise
 
 PDF page rendering requires a backend command (`render_pdf_page`) that does not exist yet. The preview section shows a placeholder with the file icon and page count. This is explicitly deferred (spec FR-4).
 
-### D5: Component Structure
+### D5: Conversion Entry Point
+
+Conversion is initiated from the Library screen's detail panel via the "Convert to EPUB" button. This replaces the old "Convert selected" button on the Import screen. Conversion is single-file: click a file in the library, then click "Convert to EPUB". The button calls `startConversion([file.path])` and navigates to `/converting`.
+
+### D6: Component Structure
 
 Components are co-located in `src/components/library/`. The screen follows the same page-level pattern as ImportScreen: header row with title + actions, then content below.
 
@@ -49,7 +57,7 @@ Components are co-located in `src/components/library/`. The screen follows the s
 
 ### Import Screen → Library
 
-`ImportListRow` passes the file path via React Router state: `navigate('/library', { state: { selectedPath: file.path } })`. LibraryScreen reads this on mount to pre-select the document.
+Files move from staging to library when the user clicks "Import to library" on the Import screen. The `IMPORT_TO_LIBRARY` reducer action moves the file from `stagedFiles` to `files`, adding `bookId` and `storedPdfPath`. The file then appears in the library's document list.
 
 ### Library → Conversion
 
@@ -61,7 +69,7 @@ The "Convert to EPUB" button uses the existing `useConversion` hook's `startConv
 
 ### Storage → Library (Persistence)
 
-The import flow in `useImport.js` calls `saveBookMetadata()` after successfully importing a PDF and extracting its metadata. This writes a `metadata.json` file to the book's storage directory (`<app_data>/books/<uuid>/metadata.json`). On startup, `ImportProvider` calls `listBooks()` in a `useEffect` to load all persisted books into the file Map via the `LOAD_LIBRARY` reducer action. The load is resilient: missing or malformed metadata files are silently skipped.
+The import flow in `useImport.js` calls `importPdf()` and `saveBookMetadata()` during the "Import to library" action. This copies the PDF to managed storage and writes a `metadata.json` file to the book's storage directory. On startup, `ImportProvider` calls `listBooks()` in a `useEffect` to load all persisted books into the `files` Map via the `LOAD_LIBRARY` reducer action.
 
 ## Risk Mitigation
 

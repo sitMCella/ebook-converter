@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { FileText } from 'lucide-react';
 import { Checkbox } from '../ui/Checkbox';
 import { StatusBadge } from './StatusBadge';
 import { formatFileSize } from '../../lib/format';
 
 export function ImportListRow({ file, selected, onToggleSelect }) {
-  const navigate = useNavigate();
   const [showError, setShowError] = useState(false);
 
   const fileSize = file.metadata?.fileSize ?? file.size;
@@ -27,16 +25,9 @@ export function ImportListRow({ file, selected, onToggleSelect }) {
           label={`Select ${file.name}`}
         />
         <FileText size={18} className="text-[var(--text-accent)] shrink-0" />
-        <button
-          type="button"
-          className="flex-1 min-w-0 text-left text-[13px] font-medium truncate hover:underline bg-transparent border-none cursor-pointer p-0 text-[var(--text-primary)]"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate('/library', { state: { selectedPath: file.path } });
-          }}
-        >
+        <span className="flex-1 min-w-0 text-[13px] font-medium truncate text-[var(--text-primary)]">
           {file.name}
-        </button>
+        </span>
         {fileSize > 0 && (
           <span className="text-[12px] text-[var(--text-muted)] shrink-0">
             {formatFileSize(fileSize)}

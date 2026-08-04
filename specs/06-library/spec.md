@@ -2,19 +2,17 @@
 
 ## Goal
 
-Provide a dedicated screen for inspecting imported PDF documents before conversion. Users can browse their imported files, view metadata, and optionally set per-document conversion overrides.
+Provide a dedicated screen for inspecting imported PDF documents before conversion. Users can browse their imported files, view metadata, configure per-document conversion overrides, and initiate conversion.
 
 ## Background
 
-The Import screen (spec 03) handles bringing PDF files into the application. Once imported, users need a way to inspect individual documents — checking metadata, previewing pages, and configuring per-document conversion settings before converting. The Library screen fills this gap, serving as the middle step between import and conversion.
-
-The Import list already links to the Library screen (clicking a file name navigates to `/library`), but the screen itself is currently a placeholder.
+The Import screen (spec 03) provides a staging area where users browse or drag-and-drop PDFs, validate them, and then explicitly import them to the library via "Import to library". Once in the library, users can inspect individual documents — checking metadata, previewing pages, and configuring per-document conversion settings before converting. The Library screen serves as the hub between import and conversion.
 
 ## Functional Requirements
 
 ### FR-1: Document List
 
-A scrollable list panel (260 px wide) on the left side of the screen shows all imported PDFs. Each item displays:
+A scrollable list panel (260 px wide) on the left side of the screen shows all imported PDFs (from `state.files`, the library Map). Each item displays:
 - File name (truncated with ellipsis if needed).
 - File size (muted, 12 px).
 
@@ -66,17 +64,15 @@ A full-width primary button "Convert to EPUB" below the conversion options. Disa
 - "View EPUB" (primary) — navigates to the Converted screen with the corresponding EPUB selected.
 - "Reconvert to EPUB" (secondary) — starts a new conversion.
 
+Conversion is initiated from the library, not from the import staging area.
+
 ### FR-7: Empty State
 
-When no files have been imported, the screen shows: "Your library is empty. Import some PDFs to get started." with a "Go to Import" button.
+When no files have been imported to the library, the screen shows: "Your library is empty. Import some PDFs to get started." with a "Go to Import" button.
 
-### FR-8: Navigation from Import
+### FR-8: Library Persistence
 
-Clicking a file name in the Import list navigates to the Library screen with that document pre-selected.
-
-### FR-9: Library Persistence
-
-The library persists across application restarts. When a PDF is imported, its metadata is saved to a `metadata.json` file alongside the stored PDF in `<app_data>/books/<uuid>/`. On application startup, the `ImportProvider` loads all persisted book metadata and populates the file Map, so the Library screen shows previously imported books without re-importing.
+The library persists across application restarts. When a PDF is imported to the library (via "Import to library" on the Import screen), its metadata is saved to a `metadata.json` file alongside the stored PDF in `<app_data>/books/<uuid>/`. On application startup, the `ImportProvider` loads all persisted book metadata and populates the `files` Map, so the Library screen shows previously imported books without re-importing.
 
 ## Non-Functional Requirements
 
@@ -99,3 +95,4 @@ The two-panel layout fills the available space. The document list has a fixed wi
 
 - Page-by-page PDF rendering in the preview area (requires backend command).
 - Drag-and-drop reordering of the document list.
+- Multi-select batch conversion from library (conversion is single-file from the detail panel).
