@@ -61,7 +61,6 @@ test.describe('Import Screen — File Import via Browse', () => {
     await fileChooser.setFiles(createFakeFile('test-document.pdf'));
 
     await expect(page.getByText('test-document.pdf')).toBeVisible();
-    await expect(page.getByText('Ready')).toBeVisible();
     await expect(page.getByText('No files imported yet.')).not.toBeVisible();
   });
 
@@ -79,7 +78,6 @@ test.describe('Import Screen — File Import via Browse', () => {
     await expect(page.getByText('first.pdf')).toBeVisible();
     await expect(page.getByText('second.pdf')).toBeVisible();
     await expect(page.getByText('third.pdf')).toBeVisible();
-    await expect(page.getByText('Ready')).toHaveCount(3);
   });
 
   test('shows "Recent imports" label when files are present', async ({ page }) => {
@@ -264,13 +262,12 @@ test.describe('Import Screen — Confirmation Dialog', () => {
 });
 
 test.describe('Import Screen — Status Badges', () => {
-  test('status badge has aria-label for accessibility', async ({ page }) => {
+  test('does not show status badge for non-error files', async ({ page }) => {
     await page.goto('/import');
     await importFile(page, 'accessible.pdf');
 
     const badge = page.locator('[aria-label="Status: Ready"]');
-    await expect(badge).toBeVisible();
-    await expect(badge).toHaveText('Ready');
+    await expect(badge).not.toBeVisible();
   });
 });
 
