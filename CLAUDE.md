@@ -50,13 +50,24 @@ The Rust backend exposes two IPC commands registered in `src-tauri/src/lib.rs`:
 - `get_pdf_metadata` — returns camelCase metadata (pageCount, pdfVersion, fileSize, etc.)
 
 ### Frontend State
-Import state lives in `src/contexts/ImportContext.jsx` using `useReducer` with a `Map<path, file>` for files and a `Set<path>` for selections. Actions: `ADD_FILES`, `REMOVE_FILES`, `UPDATE_STATUS`, `SET_METADATA`, `TOGGLE_SELECTION`, `SELECT_ALL`, `DESELECT_ALL`. State is session-only (not persisted).
+Import state lives in `src/contexts/ImportContext.jsx` using `useReducer` with two Maps:
+- `stagedFiles: Map<path, file>` — files in the Import screen's staging area (session-only, not persisted)
+- `files: Map<path, file>` — files in the library (persisted via `metadata.json` in managed storage)
+- `selectedPaths: Set<path>` — UI checkbox selections (references staged files)
 
-### Import Flow
-`src/hooks/useImport.js` orchestrates file import: duplicate check → add to state → validate via Rust → extract metadata. `src/hooks/useDragDrop.js` listens to Tauri drag-drop events (no-op in browser).
+Staging actions: `STAGE_FILES`, `UNSTAGE_FILES`, `UPDATE_STAGED_STATUS`, `SET_STAGED_METADATA`.
+Library actions: `ADD_FILES`, `REMOVE_FILES`, `UPDATE_STATUS`, `SET_METADATA`, `LOAD_LIBRARY`.
+Bridge action: `IMPORT_TO_LIBRARY` — moves a file from staging to library with bookId and storedPdfPath.
+
+### Import Flow (Two-Phase)
+`src/hooks/useImport.js` exposes two functions:
+- `stageFiles(paths)` — validates PDFs and adds to staging area. Checks for duplicates against both staged files and library. Does NOT copy to storage.
+- `importStagedFiles(paths)` — copies staged files to managed storage via `importPdf`, saves metadata, and dispatches `IMPORT_TO_LIBRARY` to move from staging to library.
+
+`src/hooks/useDragDrop.js` listens to Tauri drag-drop events (no-op in browser) and calls `stageFiles`.
 
 ### Routing
-React Router in `src/App.jsx`. Routes: `/import` (default, redirected from `/`), `/library`, `/converted`, `/settings`. Only Import is implemented; others are placeholders.
+React Router in `src/App.jsx`. Routes: `/import` (default, redirected from `/`), `/library`, `/converting`, `/converted`, `/settings`.
 
 ### Styling
 Tailwind CSS v4 with CSS custom properties for theming in `src/index.css`. Light/dark mode via `prefers-color-scheme`. All colors reference `var(--*)` tokens — use these, not raw color values.

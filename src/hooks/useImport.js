@@ -5,15 +5,15 @@ import { validatePdf, getPdfMetadata, getFileSize, importPdf, saveBookMetadata }
 
 export function useImport() {
   const { state, dispatch } = useImportContext();
-  const [isImporting, setIsImporting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const importFiles = useCallback(
+  const stageFiles = useCallback(
     async (paths) => {
       if (!paths || paths.length === 0) return;
 
       const newPaths = [];
       for (const path of paths) {
-        if (state.files.has(path)) {
+        if (state.stagedFiles.has(path) || state.files.has(path)) {
           toast.info('File already imported', { duration: 3000 });
         } else {
           newPaths.push(path);
@@ -22,7 +22,7 @@ export function useImport() {
 
       if (newPaths.length === 0) return;
 
-      setIsImporting(true);
+      setIsProcessing(true);
 
       const newFiles = newPaths.map((path) => ({
         path,
@@ -33,14 +33,14 @@ export function useImport() {
         metadata: null,
       }));
 
-      dispatch({ type: 'ADD_FILES', files: newFiles });
+      dispatch({ type: 'STAGE_FILES', files: newFiles });
 
       await Promise.all(
         newPaths.map(async (path) => {
           try {
             const size = await getFileSize(path);
             dispatch({
-              type: 'SET_METADATA',
+              type: 'SET_STAGED_METADATA',
               path,
               metadata: { fileSize: size },
             });
@@ -49,7 +49,7 @@ export function useImport() {
 
             if (validation.status === 'encrypted') {
               dispatch({
-                type: 'UPDATE_STATUS',
+                type: 'UPDATE_STAGED_STATUS',
                 path,
                 status: 'error',
                 errorMessage:
@@ -60,7 +60,7 @@ export function useImport() {
 
             if (validation.status === 'error') {
               dispatch({
-                type: 'UPDATE_STATUS',
+                type: 'UPDATE_STAGED_STATUS',
                 path,
                 status: 'error',
                 errorMessage:
@@ -71,11 +71,38 @@ export function useImport() {
             }
 
             const metadata = await getPdfMetadata(path);
-            dispatch({ type: 'SET_METADATA', path, metadata });
+            dispatch({ type: 'SET_STAGED_METADATA', path, metadata });
+          } catch (err) {
+            dispatch({
+              type: 'UPDATE_STAGED_STATUS',
+              path,
+              status: 'error',
+              errorMessage: `Failed to process file: ${err.message || err}`,
+            });
+          }
+        })
+      );
 
+      setIsProcessing(false);
+    },
+    [state.stagedFiles, state.files, dispatch]
+  );
+
+  const importStagedFiles = useCallback(
+    async (paths) => {
+      if (!paths || paths.length === 0) return;
+
+      setIsProcessing(true);
+
+      await Promise.all(
+        paths.map(async (path) => {
+          const file = state.stagedFiles.get(path);
+          if (!file || file.status !== 'ready') return;
+
+          try {
             const stored = await importPdf(path);
             dispatch({
-              type: 'SET_STORAGE_INFO',
+              type: 'IMPORT_TO_LIBRARY',
               path,
               bookId: stored.bookId,
               storedPdfPath: stored.storedPdfPath,
@@ -83,6 +110,7 @@ export function useImport() {
 
             if (stored.bookId) {
               const name = path.split(/[\\/]/).pop();
+              const metadata = file.metadata || {};
               await saveBookMetadata({
                 bookId: stored.bookId,
                 storedPdfPath: stored.storedPdfPath,
@@ -99,23 +127,21 @@ export function useImport() {
                 status: 'ready',
               });
             }
-
-            dispatch({ type: 'UPDATE_STATUS', path, status: 'ready' });
           } catch (err) {
             dispatch({
-              type: 'UPDATE_STATUS',
+              type: 'UPDATE_STAGED_STATUS',
               path,
               status: 'error',
-              errorMessage: `Failed to process file: ${err.message || err}`,
+              errorMessage: `Failed to import file: ${err.message || err}`,
             });
           }
         })
       );
 
-      setIsImporting(false);
+      setIsProcessing(false);
     },
-    [state.files, dispatch]
+    [state.stagedFiles, dispatch]
   );
 
-  return { importFiles, isImporting };
+  return { stageFiles, importStagedFiles, isProcessing };
 }

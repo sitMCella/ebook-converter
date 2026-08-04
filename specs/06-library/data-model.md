@@ -4,11 +4,11 @@
 
 ### File Object (extended)
 
-The existing file object in the `ImportContext` Map gains an `overrides` field:
+The existing file object in the `ImportContext` `files` Map gains an `overrides` field:
 
 ```javascript
 {
-  // ... existing fields (path, name, size, status, metadata, bookId, etc.)
+  // ... existing fields (path, name, size, status, metadata, bookId, storedPdfPath, etc.)
   overrides: Partial<ConversionSettings> | undefined,
 }
 ```
@@ -30,7 +30,16 @@ dispatch({
 })
 ```
 
-The `LOAD_LIBRARY` action populates the file Map from persisted metadata. It does not overwrite entries that already exist (e.g. files imported during the current session before the async load completes).
+The `LOAD_LIBRARY` action populates the `files` Map from persisted metadata. It does not overwrite entries that already exist (e.g. files imported during the current session before the async load completes).
+
+## Relationship to Staging
+
+The library (`state.files`) is populated in two ways:
+
+1. **Import from staging** — the `IMPORT_TO_LIBRARY` action moves a file from `state.stagedFiles` to `state.files`, adding `bookId` and `storedPdfPath`.
+2. **Load on startup** — the `LOAD_LIBRARY` action populates `state.files` from persisted metadata on disk.
+
+The staging area (`state.stagedFiles`) never feeds directly into the library screen — only files that have been explicitly imported appear here.
 
 ## Per-Document Overrides Shape
 

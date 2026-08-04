@@ -12,7 +12,7 @@ Currently the application does not copy imported PDFs — it references them by 
 - Moving or deleting the original PDF breaks the reference.
 - Converted EPUBs live outside the app's control, with collision-avoidance numbering for duplicate names.
 
-This feature introduces managed storage so the application owns copies of both source and output files, enabling future features like persistent library, reconversion, and export.
+This feature introduces managed storage so the application owns copies of both source and output files, enabling persistent library, reconversion, and export.
 
 ## Storage Locations
 
@@ -35,8 +35,10 @@ Each book is stored in its own UUID-named subdirectory under a `books/` folder w
     <uuid-1>/
       Design patterns.pdf     (copy of the imported PDF, original name preserved)
       Design patterns.epub    (converted EPUB, created on conversion)
+      metadata.json           (book metadata, persisted on import)
     <uuid-2>/
       My report.pdf
+      metadata.json
     ...
 ```
 
@@ -53,16 +55,17 @@ Per-book subdirectories are chosen over a flat structure for these reasons:
 
 ## Functional Requirements
 
-### FR-1: Copy PDF on Import
+### FR-1: Copy PDF on Import to Library
 
-When a PDF file is imported (via file dialog or drag-and-drop), the application copies the file into managed storage:
+When a user clicks "Import to library" on the Import screen for staged files, the application copies each file into managed storage:
 
 1. Generate a new UUID v4 as the book identifier.
 2. Create the directory `<app_data_dir>/books/<uuid>/`.
 3. Copy the source PDF into the directory, preserving the original filename (e.g., `Design patterns.pdf`).
-4. Return the book ID and stored path to the frontend.
+4. Save metadata to `<uuid>/metadata.json`.
+5. Return the book ID and stored path to the frontend.
 
-The copy happens in the Rust backend (not via the frontend filesystem plugin) to avoid scope restrictions.
+The copy happens in the Rust backend (not via the frontend filesystem plugin) to avoid scope restrictions. This is triggered by the "Import to library" action, NOT during the initial staging/validation phase.
 
 ### FR-2: Store EPUB in Book Directory
 
@@ -70,7 +73,9 @@ When a PDF is converted to EPUB, the output file is written to `<book_dir>/<stem
 
 ### FR-3: Delete Book from Storage
 
-When a user removes a book from the import list, the application deletes the entire book directory (`<app_data_dir>/books/<uuid>/`), removing both the source PDF and any converted EPUB.
+When a user removes a book from the library, the application deletes the entire book directory (`<app_data_dir>/books/<uuid>/`), removing both the source PDF, any converted EPUB, and the metadata file.
+
+Note: removing a file from the Import screen's staging list does NOT delete from storage. Staging removal is non-destructive — it simply removes the file from the staging area. Only library-level deletion triggers storage cleanup.
 
 ### FR-4: Output Location Setting Removed
 
@@ -84,7 +89,7 @@ Users can still save a copy of a converted EPUB to any location using the existi
 
 ### NFR-1: Copy Performance
 
-PDF file copying should not block the UI. The `import_pdf` Rust command runs on Tauri's async runtime. For large files (100+ MB), the file appears in the import list immediately with status `Ready`; the copy completes in the background.
+PDF file copying should not block the UI. The `import_pdf` Rust command runs on Tauri's async runtime. For large files (100+ MB), the file appears in the library immediately with status `Ready`; the copy completes in the background.
 
 ### NFR-2: Disk Space
 
@@ -112,11 +117,10 @@ The "Open folder" button in the header opens the `<app_data_dir>/books/` directo
 
 ### Import Screen (Screen 1)
 
-No visual changes. The import flow is unchanged from the user's perspective — files are added via dialog or drag-and-drop and appear in the import list. The PDF copy to managed storage happens transparently.
+The import screen operates as a staging area. Files are validated and previewed in the staging list. The PDF copy to managed storage happens only when the user clicks "Import to library", at which point files move from staging to the library. Removing staged files is non-destructive — no storage operations occur.
 
 ## Out of Scope
 
-- Persistent library state across sessions (the import list is still session-only; persistence is a future feature).
 - Migration from an existing output folder — there is no prior managed storage to migrate from.
 - Configurable storage location — the app data directory is fixed per platform.
 - Deduplication of identical PDFs imported from different paths.

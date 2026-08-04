@@ -5,6 +5,7 @@ const ImportContext = createContext(null);
 
 const initialState = {
   files: new Map(),
+  stagedFiles: new Map(),
   selectedPaths: new Set(),
 };
 
@@ -102,7 +103,7 @@ function importReducer(state, action) {
       return { ...state, selectedPaths: newSelected };
     }
     case 'SELECT_ALL': {
-      const newSelected = new Set(state.files.keys());
+      const newSelected = new Set(state.stagedFiles.keys());
       return { ...state, selectedPaths: newSelected };
     }
     case 'DESELECT_ALL': {
@@ -118,6 +119,59 @@ function importReducer(state, action) {
         });
       }
       return { ...state, files: newFiles };
+    }
+    case 'STAGE_FILES': {
+      const newStaged = new Map(state.stagedFiles);
+      for (const file of action.files) {
+        if (!newStaged.has(file.path)) {
+          newStaged.set(file.path, file);
+        }
+      }
+      return { ...state, stagedFiles: newStaged };
+    }
+    case 'UNSTAGE_FILES': {
+      const newStaged = new Map(state.stagedFiles);
+      const newSelected = new Set(state.selectedPaths);
+      for (const path of action.paths) {
+        newStaged.delete(path);
+        newSelected.delete(path);
+      }
+      return { ...state, stagedFiles: newStaged, selectedPaths: newSelected };
+    }
+    case 'UPDATE_STAGED_STATUS': {
+      const newStaged = new Map(state.stagedFiles);
+      const file = newStaged.get(action.path);
+      if (file) {
+        newStaged.set(action.path, {
+          ...file,
+          status: action.status,
+          errorMessage: action.errorMessage,
+        });
+      }
+      return { ...state, stagedFiles: newStaged };
+    }
+    case 'SET_STAGED_METADATA': {
+      const newStaged = new Map(state.stagedFiles);
+      const file = newStaged.get(action.path);
+      if (file) {
+        newStaged.set(action.path, { ...file, metadata: action.metadata });
+      }
+      return { ...state, stagedFiles: newStaged };
+    }
+    case 'IMPORT_TO_LIBRARY': {
+      const file = state.stagedFiles.get(action.path);
+      if (!file) return state;
+      const newStaged = new Map(state.stagedFiles);
+      const newSelected = new Set(state.selectedPaths);
+      const newFiles = new Map(state.files);
+      newFiles.set(action.path, {
+        ...file,
+        bookId: action.bookId,
+        storedPdfPath: action.storedPdfPath,
+      });
+      newStaged.delete(action.path);
+      newSelected.delete(action.path);
+      return { ...state, files: newFiles, stagedFiles: newStaged, selectedPaths: newSelected };
     }
     case 'LOAD_LIBRARY': {
       const newFiles = new Map(state.files);
