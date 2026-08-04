@@ -189,6 +189,18 @@ describe('LibraryScreen', () => {
     expect(screen.getByText(/no documents match/i)).toBeInTheDocument();
   });
 
+  it('shows error badge only for error documents', () => {
+    renderLibrary({
+      files: [
+        { path: '/a.pdf', name: 'a.pdf', size: 1024, status: 'ready', metadata: { fileSize: 1024 } },
+        { path: '/b.pdf', name: 'b.pdf', size: 1024, status: 'error', errorMessage: 'Corrupted', metadata: { fileSize: 1024 } },
+      ],
+    });
+    const badges = screen.getAllByText('Error');
+    expect(badges).toHaveLength(1);
+    expect(screen.queryByText('Ready')).not.toBeInTheDocument();
+  });
+
   it('shows page preview placeholder', () => {
     renderLibrary();
     expect(screen.getByText(/page preview not yet available/i)).toBeInTheDocument();

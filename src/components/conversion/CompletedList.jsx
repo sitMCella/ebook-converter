@@ -36,7 +36,7 @@ export function CompletedList() {
               <span className="flex-1 min-w-0 text-[13px] font-medium truncate text-[var(--text-primary)]">
                 {file.name}
               </span>
-              <StatusBadge status={file.status} />
+              {file.status === 'error' && <StatusBadge status="error" />}
             </div>
           );
         })}

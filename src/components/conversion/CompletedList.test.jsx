@@ -100,17 +100,21 @@ describe('CompletedList', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/converted', { state: { selectedPath: '/a.pdf' } });
   });
 
-  it('shows status badge for each completed file', () => {
+  it('shows error badge for failed files but not for converted files', () => {
     render(
       <Wrapper>
         <SeedCompleted
-          files={[{ path: '/a.pdf', name: 'a.pdf', status: 'converted' }]}
-          completedPaths={['/a.pdf']}
+          files={[
+            { path: '/a.pdf', name: 'a.pdf', status: 'converted' },
+            { path: '/b.pdf', name: 'b.pdf', status: 'error' },
+          ]}
+          completedPaths={['/a.pdf', '/b.pdf']}
         >
           <CompletedList />
         </SeedCompleted>
       </Wrapper>,
     );
-    expect(screen.getByText('Converted')).toBeInTheDocument();
+    expect(screen.getByText('Error')).toBeInTheDocument();
+    expect(screen.queryByText('Converted')).not.toBeInTheDocument();
   });
 });
