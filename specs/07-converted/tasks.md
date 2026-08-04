@@ -42,10 +42,10 @@
 - [x] Wire "Open folder" header button to `openFolder()`
 - [x] Wire "Save as..." button to existing `saveFile()` (read EPUB bytes from disk first)
 
-### T6: Shell Plugin Setup (Deferred)
-- [ ] Install `@tauri-apps/plugin-shell` (npm) and `tauri-plugin-shell` (Cargo)
-- [ ] Register plugin in `src-tauri/src/lib.rs`
-- [ ] Add `shell:allow-open` to capabilities
+### T6: Shell Plugin Setup
+- [x] Install `@tauri-apps/plugin-shell` (npm) and `tauri-plugin-shell` (Cargo)
+- [x] Register plugin in `src-tauri/src/lib.rs`
+- [x] Add `shell:allow-open` to capabilities
 
 ## Phase 3: Persistence
 
