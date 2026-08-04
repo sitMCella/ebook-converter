@@ -8,7 +8,17 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+  };
+});
+
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
+import { SettingsProvider } from '../../contexts/SettingsContext';
 import { ConversionOptions } from './ConversionOptions';
 import { useEffect } from 'react';
 
@@ -31,11 +41,13 @@ function renderOptions(fileOverrides = {}) {
   };
 
   return render(
-    <ImportProvider>
-      <MemoryRouter>
-        <SeedAndRender file={file} />
-      </MemoryRouter>
-    </ImportProvider>,
+    <SettingsProvider>
+      <ImportProvider>
+        <MemoryRouter>
+          <SeedAndRender file={file} />
+        </MemoryRouter>
+      </ImportProvider>
+    </SettingsProvider>,
   );
 }
 

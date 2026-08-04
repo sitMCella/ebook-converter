@@ -25,20 +25,28 @@ vi.mock('../../lib/tauri', async () => {
   };
 });
 
-vi.mock('../../lib/settings', () => ({
-  loadSettings: vi.fn().mockResolvedValue({}),
-  settingsToConversionOptions: vi.fn().mockReturnValue({}),
-}));
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+    settingsToConversionOptions: vi.fn().mockReturnValue({}),
+  };
+});
 
 import { deleteBook } from '../../lib/tauri';
+import { SettingsProvider } from '../../contexts/SettingsContext';
 
 function Wrapper({ children }) {
   return (
-    <ImportProvider>
-      <ConversionProvider>
-        <MemoryRouter>{children}</MemoryRouter>
-      </ConversionProvider>
-    </ImportProvider>
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter>{children}</MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>
   );
 }
 

@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS = {
     baseFontSize: 12,
     lineHeight: 1.5,
     margins: 1.0,
+    textAlignment: 'justify',
   },
   pageHandling: {
     skipBlankPages: true,
@@ -29,9 +30,9 @@ export const DEFAULT_SETTINGS = {
     pageRangeFrom: null,
     pageRangeTo: null,
     splitChaptersBy: 'heading1',
-  },
-  outputLocation: {
-    defaultFolder: '~/Documents/Ebooks',
+    keepPageBreaks: false,
+    removePageNumbers: true,
+    coverPage: 'auto',
   },
 };
 
@@ -107,7 +108,7 @@ export function settingsToConversionOptions(settings, { outputFolder, bookId } =
     images: settings.images,
     output: settings.output,
     pageHandling: settings.pageHandling,
-    outputFolder: outputFolder || settings.outputLocation?.defaultFolder || '~/Documents/Ebooks',
+    outputFolder: outputFolder || '~/Documents/Ebooks',
     bookId: bookId || null,
   };
 }

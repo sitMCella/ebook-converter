@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useConversionContext } from '../contexts/ConversionContext';
 import { useImportContext } from '../contexts/ImportContext';
+import { useSettings } from '../contexts/SettingsContext';
 import { convertPdfToEpub, cancelConversion, onConversionProgress, saveBookMetadata } from '../lib/tauri';
-import { loadSettings, settingsToConversionOptions } from '../lib/settings';
+import { settingsToConversionOptions } from '../lib/settings';
 
 export function useConversion() {
   const { state: conversionState, dispatch: conversionDispatch } = useConversionContext();
   const { state: importState, dispatch: importDispatch } = useImportContext();
+  const { settings: globalSettings } = useSettings();
   const isConvertingRef = useRef(false);
   const settingsRef = useRef(null);
 
@@ -45,7 +47,7 @@ export function useConversion() {
       importDispatch({ type: 'UPDATE_STATUS', path, status: 'converting' });
 
       try {
-        const settings = settingsRef.current || await loadSettings();
+        const settings = settingsRef.current || globalSettings;
         const file = importState.files.get(path);
         const bookId = file?.bookId;
         const pdfPath = file?.storedPdfPath || path;
@@ -108,13 +110,13 @@ export function useConversion() {
         });
       }
     },
-    [importState.files, importDispatch, conversionDispatch],
+    [importState.files, importDispatch, conversionDispatch, globalSettings],
   );
 
   const processQueue = useCallback(
     async (paths) => {
       isConvertingRef.current = true;
-      settingsRef.current = await loadSettings();
+      settingsRef.current = globalSettings;
 
       for (const path of paths) {
         if (!isConvertingRef.current) break;

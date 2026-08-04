@@ -14,10 +14,15 @@ vi.mock('../../lib/tauri', () => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../../lib/settings', () => ({
-  loadSettings: vi.fn().mockResolvedValue({}),
-  settingsToConversionOptions: vi.fn().mockReturnValue({}),
-}));
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+    settingsToConversionOptions: vi.fn().mockReturnValue({}),
+  };
+});
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -43,13 +48,17 @@ function SeedConversion({ files, paths, complete, children }) {
   return children;
 }
 
+import { SettingsProvider } from '../../contexts/SettingsContext';
+
 function Wrapper({ children }) {
   return (
-    <ImportProvider>
-      <ConversionProvider>
-        <MemoryRouter>{children}</MemoryRouter>
-      </ConversionProvider>
-    </ImportProvider>
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter>{children}</MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>
   );
 }
 

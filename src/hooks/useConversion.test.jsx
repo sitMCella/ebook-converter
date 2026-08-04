@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { ImportProvider, useImportContext } from '../contexts/ImportContext';
 import { ConversionProvider, useConversionContext } from '../contexts/ConversionContext';
+import { SettingsProvider } from '../contexts/SettingsContext';
 
 vi.mock('../lib/tauri', () => ({
   convertPdfToEpub: vi.fn(),
@@ -10,20 +11,27 @@ vi.mock('../lib/tauri', () => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('../lib/settings', () => ({
-  loadSettings: vi.fn(),
-  settingsToConversionOptions: vi.fn(),
-}));
+vi.mock('../lib/settings', async () => {
+  const actual = await vi.importActual('../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn().mockResolvedValue({ ...actual.DEFAULT_SETTINGS }),
+    saveSettings: vi.fn().mockResolvedValue(undefined),
+    settingsToConversionOptions: vi.fn(),
+  };
+});
 
 import { useConversion } from './useConversion';
 import { convertPdfToEpub, cancelConversion, onConversionProgress } from '../lib/tauri';
-import { loadSettings, settingsToConversionOptions } from '../lib/settings';
+import { settingsToConversionOptions } from '../lib/settings';
 
 function wrapper({ children }) {
   return (
-    <ImportProvider>
-      <ConversionProvider>{children}</ConversionProvider>
-    </ImportProvider>
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>{children}</ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>
   );
 }
 
@@ -48,7 +56,6 @@ describe('useConversion', () => {
       progressCallback = cb;
       return Promise.resolve(() => {});
     });
-    loadSettings.mockResolvedValue({ structure: {}, images: {} });
     settingsToConversionOptions.mockReturnValue({ outputFolder: '/out' });
     convertPdfToEpub.mockResolvedValue({ outputPath: '/out/test.epub' });
   });
@@ -97,7 +104,7 @@ describe('useConversion', () => {
     expect(convertPdfToEpub).toHaveBeenCalledWith('/a.pdf', { outputFolder: '/out' });
   });
 
-  it('loads settings once for the batch', async () => {
+  it('uses same settings for all files in a batch', async () => {
     const { result } = renderUseConversion();
 
     await act(async () => {
@@ -114,8 +121,11 @@ describe('useConversion', () => {
       result.current.conversion.startConversion(['/a.pdf', '/b.pdf']);
     });
 
-    expect(loadSettings).toHaveBeenCalledTimes(1);
     expect(convertPdfToEpub).toHaveBeenCalledTimes(2);
+    expect(settingsToConversionOptions).toHaveBeenCalledTimes(2);
+    const firstCallSettings = settingsToConversionOptions.mock.calls[0][0];
+    const secondCallSettings = settingsToConversionOptions.mock.calls[1][0];
+    expect(firstCallSettings).toBe(secondCallSettings);
   });
 
   it('sets error status when conversion fails', async () => {

@@ -8,8 +8,18 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
   listBooks: vi.fn().mockResolvedValue([]),
 }));
 
+vi.mock('../../lib/settings', async () => {
+  const actual = await vi.importActual('../../lib/settings');
+  return {
+    ...actual,
+    loadSettings: vi.fn(() => Promise.resolve({ ...actual.DEFAULT_SETTINGS })),
+    saveSettings: vi.fn(() => Promise.resolve()),
+  };
+});
+
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionProvider } from '../../contexts/ConversionContext';
+import { SettingsProvider } from '../../contexts/SettingsContext';
 import { LibraryScreen } from './LibraryScreen';
 import { useEffect } from 'react';
 
@@ -77,28 +87,32 @@ function SeedFiles({ files, children }) {
 
 function renderLibrary({ files = testFiles, initialPath = '/library' } = {}) {
   return render(
-    <ImportProvider>
-      <ConversionProvider>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <SeedFiles files={files}>
-            <LibraryScreen />
-          </SeedFiles>
-        </MemoryRouter>
-      </ConversionProvider>
-    </ImportProvider>,
+    <SettingsProvider>
+      <ImportProvider>
+        <ConversionProvider>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <SeedFiles files={files}>
+              <LibraryScreen />
+            </SeedFiles>
+          </MemoryRouter>
+        </ConversionProvider>
+      </ImportProvider>
+    </SettingsProvider>,
   );
 }
 
 describe('LibraryScreen', () => {
   it('shows empty state when no files are imported', () => {
     render(
-      <ImportProvider>
-        <ConversionProvider>
-          <MemoryRouter>
-            <LibraryScreen />
-          </MemoryRouter>
-        </ConversionProvider>
-      </ImportProvider>,
+      <SettingsProvider>
+        <ImportProvider>
+          <ConversionProvider>
+            <MemoryRouter>
+              <LibraryScreen />
+            </MemoryRouter>
+          </ConversionProvider>
+        </ImportProvider>
+      </SettingsProvider>,
     );
     expect(screen.getByText(/your library is empty/i)).toBeInTheDocument();
     expect(screen.getByText('Go to Import')).toBeInTheDocument();
@@ -107,13 +121,15 @@ describe('LibraryScreen', () => {
   it('navigates to /import when "Go to Import" is clicked', async () => {
     const user = userEvent.setup();
     render(
-      <ImportProvider>
-        <ConversionProvider>
-          <MemoryRouter>
-            <LibraryScreen />
-          </MemoryRouter>
-        </ConversionProvider>
-      </ImportProvider>,
+      <SettingsProvider>
+        <ImportProvider>
+          <ConversionProvider>
+            <MemoryRouter>
+              <LibraryScreen />
+            </MemoryRouter>
+          </ConversionProvider>
+        </ImportProvider>
+      </SettingsProvider>,
     );
     await user.click(screen.getByText('Go to Import'));
     expect(mockNavigate).toHaveBeenCalledWith('/import');
