@@ -60,6 +60,7 @@ pub struct OutputOptions {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PageHandlingOptions {
     pub skip_blank_pages: bool,
     pub page_range: String,
