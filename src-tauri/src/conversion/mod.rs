@@ -72,6 +72,13 @@ pub struct PageHandlingOptions {
     pub cover_page: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TocEntry {
+    pub title: String,
+    pub level: u8,
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversionResult {
@@ -79,6 +86,7 @@ pub struct ConversionResult {
     pub chapters: usize,
     pub images: usize,
     pub file_size: u64,
+    pub toc: Vec<TocEntry>,
 }
 
 #[derive(Serialize, Clone)]

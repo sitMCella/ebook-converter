@@ -1,3 +1,4 @@
+use crate::conversion::TocEntry;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::Manager;
@@ -34,6 +35,8 @@ pub struct BookMetadata {
     pub images: Option<usize>,
     #[serde(default)]
     pub epub_file_size: Option<u64>,
+    #[serde(default)]
+    pub toc: Option<Vec<TocEntry>>,
 }
 
 pub fn get_books_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -224,6 +227,7 @@ mod tests {
             chapters: None,
             images: None,
             epub_file_size: None,
+            toc: None,
         }
     }
 
