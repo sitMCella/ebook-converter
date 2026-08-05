@@ -6,6 +6,7 @@ use super::text_extractor;
 use super::{ConversionOptions, ConversionProgress, ConversionResult};
 use crate::pdf;
 use crate::storage;
+use lopdf::Document;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
@@ -39,8 +40,13 @@ pub async fn run_conversion(
         }
     };
 
-    if cover_image.is_some() && !pages.is_empty() {
-        pages.remove(0);
+    if cover_image.is_some() && pages.len() > 1 {
+        let pdf_page_count = Document::load(path)
+            .map(|doc| doc.get_pages().len())
+            .unwrap_or(0);
+        if pages.len() >= pdf_page_count {
+            pages.remove(0);
+        }
     }
 
     if pages.is_empty() && cover_image.is_none() {
