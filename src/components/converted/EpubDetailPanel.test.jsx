@@ -41,7 +41,7 @@ function renderPanel(file = baseFile) {
 describe('EpubDetailPanel', () => {
   it('renders preview, metadata, and table of contents sections', () => {
     renderPanel();
-    expect(screen.getByText('EPUB preview not yet available')).toBeInTheDocument();
+    expect(screen.getByText('No cover image available')).toBeInTheDocument();
     expect(screen.getByText('Metadata')).toBeInTheDocument();
     expect(screen.getByText('Table of contents')).toBeInTheDocument();
   });

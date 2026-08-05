@@ -185,7 +185,7 @@ describe('ConvertedScreen', () => {
 
   it('shows EPUB preview placeholder', () => {
     renderConverted();
-    expect(screen.getByText(/epub preview not yet available/i)).toBeInTheDocument();
+    expect(screen.getByText(/no cover image available/i)).toBeInTheDocument();
   });
 
   it('shows chapter count in preview', () => {
