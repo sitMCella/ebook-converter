@@ -93,4 +93,39 @@ describe('ConversionOptions', () => {
     await user.click(screen.getByText('Conversion options'));
     expect(screen.queryByText('Split chapters by')).not.toBeInTheDocument();
   });
+
+  it('shows cover page override when expanded', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    expect(screen.getByText('Cover page')).toBeInTheDocument();
+  });
+
+  it('cover page dropdown has all three options', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    const selects = screen.getAllByRole('combobox');
+    const coverSelect = selects.find((s) => {
+      const options = s.querySelectorAll('option');
+      return Array.from(options).some((o) => o.textContent.includes('Auto-detect'));
+    });
+    expect(coverSelect).toBeTruthy();
+    const options = coverSelect.querySelectorAll('option');
+    const values = Array.from(options).map((o) => o.value);
+    expect(values).toContain('auto');
+    expect(values).toContain('firstPage');
+    expect(values).toContain('none');
+  });
+
+  it('counts cover page override in override count', async () => {
+    await renderOptions({
+      overrides: {
+        pageHandling: { coverPage: 'none' },
+      },
+    });
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
 });

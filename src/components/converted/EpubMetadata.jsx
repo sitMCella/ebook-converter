@@ -41,6 +41,7 @@ export function EpubMetadata({ file }) {
     { label: 'EPUB size', value: epubSize > 0 ? formatFileSize(epubSize) : null },
     { label: 'Chapters', value: chapters > 0 ? chapters : null },
     { label: 'Images', value: images > 0 ? `${images} extracted` : null },
+    { label: 'Cover', value: result?.hasCover ? 'Included' : null },
     { label: 'Settings used', value: getSettingsLabel(file) },
   ];
 

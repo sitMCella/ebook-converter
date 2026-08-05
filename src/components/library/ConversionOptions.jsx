@@ -21,6 +21,12 @@ const PAGE_RANGE_OPTIONS = [
   { value: 'custom', label: 'Custom' },
 ];
 
+const COVER_PAGE_OPTIONS = [
+  { value: 'auto', label: 'Auto-detect' },
+  { value: 'firstPage', label: 'First page' },
+  { value: 'none', label: 'None' },
+];
+
 function OverrideRow({ label, children }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
@@ -227,6 +233,16 @@ export function ConversionOptions({ file }) {
               options={PAGE_RANGE_OPTIONS}
               onChange={(v) => setOverride('pageHandling', 'pageRange', v)}
               onReset={() => resetOverride('pageHandling', 'pageRange')}
+            />
+          </OverrideRow>
+
+          <OverrideRow label="Cover page">
+            <SelectControl
+              value={overrides.pageHandling?.coverPage}
+              defaultValue={globalSettings.pageHandling.coverPage}
+              options={COVER_PAGE_OPTIONS}
+              onChange={(v) => setOverride('pageHandling', 'coverPage', v)}
+              onReset={() => resetOverride('pageHandling', 'coverPage')}
             />
           </OverrideRow>
         </div>

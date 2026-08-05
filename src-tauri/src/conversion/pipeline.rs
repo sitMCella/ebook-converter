@@ -25,9 +25,25 @@ pub async fn run_conversion(
         return Err("Conversion cancelled".to_string());
     }
 
-    let pages = text_extractor::extract_text(path, &options.page_handling)?;
+    let mut pages = text_extractor::extract_text(path, &options.page_handling)?;
 
     if pages.is_empty() {
+        return Err("No text could be extracted from the PDF".to_string());
+    }
+
+    let cover_image = match image_extractor::extract_cover_image(path, &options.page_handling.cover_page) {
+        Ok(img) => img,
+        Err(e) => {
+            log::warn!("Cover extraction failed: {}", e);
+            None
+        }
+    };
+
+    if cover_image.is_some() && !pages.is_empty() {
+        pages.remove(0);
+    }
+
+    if pages.is_empty() && cover_image.is_none() {
         return Err("No text could be extracted from the PDF".to_string());
     }
 
@@ -124,7 +140,7 @@ pub async fn run_conversion(
 
     emit_progress(app, &path_owned, "assembling_epub", 90, "Writing EPUB file...");
 
-    let mut result = epub_generator::generate_epub(&chapters, &images, &metadata, options, &output_path)?;
+    let mut result = epub_generator::generate_epub(&chapters, &images, cover_image.as_ref(), &metadata, options, &output_path)?;
 
     let pdf_outline = pdf::extract_outline(path);
     if !pdf_outline.is_empty() {

@@ -87,6 +87,7 @@ pub struct ConversionResult {
     pub images: usize,
     pub file_size: u64,
     pub toc: Vec<TocEntry>,
+    pub has_cover: bool,
 }
 
 #[derive(Serialize, Clone)]

@@ -113,4 +113,28 @@ describe('EpubMetadata', () => {
     expect(screen.queryByText('Chapters')).not.toBeInTheDocument();
     expect(screen.queryByText('Images')).not.toBeInTheDocument();
   });
+
+  it('shows Cover row when hasCover is true', () => {
+    const file = {
+      ...baseFile,
+      conversionResult: { ...baseFile.conversionResult, hasCover: true },
+    };
+    render(<EpubMetadata file={file} />);
+    expect(screen.getByText('Cover')).toBeInTheDocument();
+    expect(screen.getByText('Included')).toBeInTheDocument();
+  });
+
+  it('hides Cover row when hasCover is false', () => {
+    const file = {
+      ...baseFile,
+      conversionResult: { ...baseFile.conversionResult, hasCover: false },
+    };
+    render(<EpubMetadata file={file} />);
+    expect(screen.queryByText('Cover')).not.toBeInTheDocument();
+  });
+
+  it('hides Cover row when hasCover is undefined', () => {
+    render(<EpubMetadata file={baseFile} />);
+    expect(screen.queryByText('Cover')).not.toBeInTheDocument();
+  });
 });
