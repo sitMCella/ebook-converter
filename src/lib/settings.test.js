@@ -118,4 +118,39 @@ describe('getEffectiveSettings', () => {
     const result = getEffectiveSettings(DEFAULT_SETTINGS, null);
     expect(result.output.epubVersion).toBe('epub3');
   });
+
+  it('overrides coverPage per document', () => {
+    const result = getEffectiveSettings(DEFAULT_SETTINGS, {
+      pageHandling: { coverPage: 'none' },
+    });
+    expect(result.pageHandling.coverPage).toBe('none');
+    expect(result.pageHandling.skipBlankPages).toBe(true);
+  });
+
+  it('preserves coverPage default when not overridden', () => {
+    const result = getEffectiveSettings(DEFAULT_SETTINGS, {
+      pageHandling: { skipBlankPages: false },
+    });
+    expect(result.pageHandling.coverPage).toBe('auto');
+  });
+});
+
+describe('settingsToConversionOptions coverPage', () => {
+  it('passes coverPage through to conversion options', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      pageHandling: { ...DEFAULT_SETTINGS.pageHandling, coverPage: 'firstPage' },
+    };
+    const result = settingsToConversionOptions(settings);
+    expect(result.pageHandling.coverPage).toBe('firstPage');
+  });
+
+  it('passes coverPage=none through to conversion options', () => {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      pageHandling: { ...DEFAULT_SETTINGS.pageHandling, coverPage: 'none' },
+    };
+    const result = settingsToConversionOptions(settings);
+    expect(result.pageHandling.coverPage).toBe('none');
+  });
 });
