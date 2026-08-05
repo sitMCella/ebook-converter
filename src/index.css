@@ -58,6 +58,33 @@
   box-sizing: border-box;
 }
 
+.epub-preview-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-primary);
+}
+.epub-preview-content h1,
+.epub-preview-content h2,
+.epub-preview-content h3 {
+  margin: 1em 0 0.4em;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+.epub-preview-content h1 { font-size: 1.4em; }
+.epub-preview-content h2 { font-size: 1.2em; }
+.epub-preview-content h3 { font-size: 1.05em; }
+.epub-preview-content p {
+  margin: 0.5em 0;
+}
+.epub-preview-content ul,
+.epub-preview-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.epub-preview-content li {
+  margin: 0.2em 0;
+}
+
 body {
   margin: 0;
   background-color: var(--surface-0);
