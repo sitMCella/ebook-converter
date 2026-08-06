@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, RefreshCw } from 'lucide-react';
-import { openFileWithSystem, isTauri } from '../../lib/tauri';
+import { ExternalLink, FolderOpen, RefreshCw } from 'lucide-react';
+import { openFileWithSystem, openFolder, getBookDir, isTauri } from '../../lib/tauri';
 import { EpubPreview } from './EpubPreview';
 import { EpubMetadata } from './EpubMetadata';
 import { Button } from '../ui/Button';
@@ -11,6 +11,15 @@ export function EpubDetailPanel({ file }) {
   const handleOpenInReader = async () => {
     if (file.outputPath) {
       await openFileWithSystem(file.outputPath);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    if (file.bookId) {
+      const dir = await getBookDir(file.bookId);
+      if (dir) {
+        await openFolder(dir);
+      }
     }
   };
 
@@ -28,6 +37,12 @@ export function EpubDetailPanel({ file }) {
           <Button variant="primary" onClick={handleOpenInReader}>
             <ExternalLink size={16} />
             Open in reader
+          </Button>
+        )}
+        {isTauri && file.bookId && (
+          <Button variant="secondary" onClick={handleOpenFolder}>
+            <FolderOpen size={16} />
+            Open folder
           </Button>
         )}
         <Button variant="secondary" onClick={handleReconvert}>

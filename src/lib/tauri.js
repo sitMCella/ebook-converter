@@ -155,6 +155,14 @@ async function getBooksDir() {
   return '';
 }
 
+async function getBookDir(bookId) {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('get_book_dir', { bookId });
+  }
+  return '';
+}
+
 async function saveBookMetadata(metadata) {
   if (isTauri) {
     const { invoke } = await import('@tauri-apps/api/core');
@@ -227,6 +235,7 @@ export {
   importPdf,
   deleteBook,
   getBooksDir,
+  getBookDir,
   saveBookMetadata,
   listBooks,
   convertPdfToEpub,

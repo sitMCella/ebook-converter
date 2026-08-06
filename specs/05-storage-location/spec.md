@@ -51,7 +51,7 @@ Per-book subdirectories are chosen over a flat structure for these reasons:
 3. **Extensibility.** Future additions (cover images, conversion logs, multiple output formats, per-book metadata JSON) fit naturally into the per-book directory without polluting a shared namespace.
 4. **Predictable output path.** The conversion pipeline writes to `<book_dir>/<stem>.epub` — no collision detection needed since each book has its own directory.
 
-**Trade-off**: browsing the storage folder manually shows opaque UUIDs instead of human-readable titles. This is acceptable because users interact through the app UI, not the filesystem.
+**Trade-off**: browsing the storage folder manually shows opaque UUIDs instead of human-readable titles. This is mitigated by the per-book "Open folder" button on the Converted screen (spec 07, FR-5), which opens the specific book's directory directly rather than the root `books/` directory. Users rarely need to browse the root folder manually.
 
 ## Functional Requirements
 
@@ -79,7 +79,7 @@ Note: removing a file from the Import screen's staging list does NOT delete from
 
 ### FR-4: Output Location Setting Removed
 
-The "Output location" setting group in the Settings screen (Screen 5) is removed. The `outputLocation.defaultFolder` field is no longer used — all output goes to the per-book directory within managed storage. The "Open folder" button on the Converted screen (Screen 4) opens the `books/` directory in the OS file manager.
+The "Output location" setting group in the Settings screen (Screen 5) is removed. The `outputLocation.defaultFolder` field is no longer used — all output goes to the per-book directory within managed storage. The "Open folder" button on the Converted screen (Screen 4) opens the selected book's specific directory (e.g., `books/<uuid>/`) in the OS file manager via the `get_book_dir` Tauri command.
 
 ## Non-Functional Requirements
 
@@ -109,7 +109,7 @@ This group is no longer displayed. The two-column settings layout is rebalanced:
 
 ### Converted Screen (Screen 4)
 
-The "Open folder" button in the header opens the `<app_data_dir>/books/` directory in the OS file manager, rather than the previous output folder.
+The "Open folder" button is located in the detail panel (per-book action, not in the header). It opens the selected book's specific directory (`<app_data_dir>/books/<uuid>/`) in the OS file manager via the `get_book_dir` Tauri command, so users land directly at the book's source PDF and converted EPUB rather than the opaque UUID-named root `books/` directory. The button is only shown when the file has a `bookId` and the app is running in Tauri mode.
 
 ### Import Screen (Screen 1)
 

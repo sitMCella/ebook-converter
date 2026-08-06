@@ -7,15 +7,17 @@ The Converted screen consumes `ImportContext` state, filtering for files with st
 ```
 ┌──────────────────────────────────────────────────────┐
 │  ConvertedScreen                                     │
-│  ┌──────────────────────────────────┬──────────────┐ │
-│  │  "Converted EPUBs"              │ [Open folder] │ │
-│  └──────────────────────────────────┴──────────────┘ │
+│  ┌──────────────────────────────────────────────────┐│
+│  │  "Converted EPUBs"                    [Search]   ││
+│  └──────────────────────────────────────────────────┘│
 │                                                      │
 │  ┌───────────────────────┬──────────────────────────┐│
 │  │  EpubList (260px)     │  EpubDetailPanel (flex-1)││
 │  │    EpubListItem       │    EpubPreview           ││
 │  │    EpubListItem       │    EpubMetadata          ││
-│  │                       │    [Action buttons]      ││
+│  │                       │    [Open in reader]      ││
+│  │                       │    [Open folder]         ││
+│  │                       │    [Reconvert]           ││
 │  └───────────────────────┴──────────────────────────┘│
 │                                                      │
 │  OR: EmptyConverted (when no files converted)        │
@@ -40,11 +42,12 @@ The preview section shows the EPUB cover image when available, extracted via the
 
 ### D4: Tauri Bridge — Open File and Open Folder
 
-Two new bridge functions are added to `src/lib/tauri.js`:
-- `openFileWithSystem(path)` — uses the Tauri shell plugin's `open()` to launch the file with the OS default app.
-- `openFolder(path)` — uses the Tauri shell plugin's `open()` to open the containing folder in the file manager.
+Three bridge functions in `src/lib/tauri.js` support the action buttons:
+- `openFileWithSystem(path)` — uses the `open_path` Tauri command to launch the file with the OS default app.
+- `openFolder(path)` — uses the `open_path` Tauri command to open a directory in the file manager.
+- `getBookDir(bookId)` — uses the `get_book_dir` Tauri command to resolve the specific book's storage directory from its UUID. The "Open folder" button in the detail panel calls `getBookDir` first, then `openFolder` with the result, so users land directly in the selected book's directory (containing the source PDF and converted EPUB) rather than the opaque root `books/` directory.
 
-Both fall back to no-ops in browser mode (with the exception of "Open in reader" which triggers a download in browser mode).
+All fall back to no-ops in browser mode.
 
 ### D5: Component Structure
 
@@ -66,10 +69,11 @@ The "Reconvert" button navigates to `/library` with the source file path via Rea
 
 ### Tauri Bridge
 
-| Function | Tauri Plugin | Description |
+| Function | Tauri Command | Description |
 |---|---|---|
-| `openFileWithSystem(path)` | `shell` plugin `open()` | Opens EPUB in default reader |
-| `openFolder(path)` | `shell` plugin `open()` | Opens output folder in file manager |
+| `openFileWithSystem(path)` | `open_path` | Opens EPUB in default reader |
+| `getBookDir(bookId)` | `get_book_dir` | Resolves book's storage directory path from UUID |
+| `openFolder(path)` | `open_path` | Opens a directory in file manager |
 | `saveFile(data, name, filters)` | `dialog` + `fs` plugins | Existing — save a copy |
 
 ### Settings

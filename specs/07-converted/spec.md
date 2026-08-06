@@ -47,11 +47,8 @@ If a metadata field is absent or zero, the row is hidden.
 Stacked vertically, full width, below the metadata:
 
 1. **"Open in reader"** — primary button, `ExternalLink` icon. Opens the EPUB file in the system's default EPUB reader application via a Tauri shell command. In browser mode, triggers a download.
-2. **"Reconvert"** — secondary button, `RefreshCw` icon. Navigates to the Library screen with the source PDF selected and the conversion options panel expanded.
-
-### FR-6: Header — Open Folder
-
-The header contains a "Open folder" secondary button with a `FolderOpen` icon. Opens the output folder in the OS file manager. In browser mode, this button is hidden.
+2. **"Open folder"** — secondary button, `FolderOpen` icon. Opens the selected book's storage directory (containing the source PDF and converted EPUB) in the OS file manager via the `get_book_dir` Tauri command. Only shown when the file has a `bookId` and the app is running in Tauri mode. Hidden in browser mode.
+3. **"Reconvert"** — secondary button, `RefreshCw` icon. Navigates to the Library screen with the source PDF selected and the conversion options panel expanded.
 
 ### FR-7: Empty State
 

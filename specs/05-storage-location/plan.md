@@ -25,6 +25,7 @@ The storage system lives in the Rust backend as a new `storage` module. The fron
 │                                                             │
 │  storage.rs                                                 │
 │    get_books_dir(app)      → <app_data_dir>/books/          │
+│    get_book_dir(app, id)   → <app_data_dir>/books/<uuid>/   │
 │    create_book_dir(app)    → books/<uuid>/                  │
 │    import_pdf(app, path)   → copy + return StoredBook       │
 │    get_epub_output_path(app, book_id) → books/<uuid>/output │
@@ -75,8 +76,11 @@ const { bookId, storedPdfPath } = await invoke('import_pdf', { sourcePath });
 // Delete a book from managed storage
 await invoke('delete_book', { bookId });
 
-// Get the books directory path (for "Open folder" button)
+// Get the books directory path
 const booksDir = await invoke('get_books_dir');
+
+// Get a specific book's directory path (for "Open folder" button)
+const bookDir = await invoke('get_book_dir', { bookId });
 ```
 
 ### Modified IPC Command
