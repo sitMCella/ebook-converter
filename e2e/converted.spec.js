@@ -74,7 +74,7 @@ async function importConvertAndNavigate(page, fileNames) {
   await expect(
     page.getByRole('heading', { name: 'Conversion complete' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: /view converted/i }).click();
+  await page.getByRole('link', { name: /converted/i }).click();
   await expect(page).toHaveURL(/\/converted/);
 }
 
@@ -283,21 +283,6 @@ test.describe('Converted Screen — Action Buttons', () => {
 // --- Navigation from Converting Screen ---
 
 test.describe('Converted Screen — Navigation from Converting', () => {
-  test('View converted button navigates to converted screen', async ({ page }) => {
-    await mockSuccessfulConversion(page);
-    await page.goto('/import');
-    await stageFile(page, 'nav-test.pdf');
-    await importAllStagedToLibrary(page);
-    await convertFromLibrary(page, 'nav-test.pdf');
-
-    await expect(
-      page.getByRole('heading', { name: 'Conversion complete' }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: /view converted/i }).click();
-    await expect(page).toHaveURL(/\/converted/);
-    await expect(page.getByText('nav-test.epub')).toBeVisible();
-  });
-
   test('clicking completed row navigates to converted screen with file selected', async ({ page }) => {
     await mockSuccessfulConversion(page);
     await page.goto('/import');
