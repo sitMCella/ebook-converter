@@ -3,7 +3,6 @@ import { ExternalLink, RefreshCw } from 'lucide-react';
 import { openFileWithSystem, isTauri } from '../../lib/tauri';
 import { EpubPreview } from './EpubPreview';
 import { EpubMetadata } from './EpubMetadata';
-import { TableOfContents } from './TableOfContents';
 import { Button } from '../ui/Button';
 
 export function EpubDetailPanel({ file }) {
@@ -23,7 +22,6 @@ export function EpubDetailPanel({ file }) {
     <div className="p-5 flex flex-col gap-6">
       <EpubPreview file={file} />
       <EpubMetadata file={file} />
-      <TableOfContents entries={file.conversionResult?.toc || []} />
 
       <div className="flex flex-col gap-2">
         {isTauri && (

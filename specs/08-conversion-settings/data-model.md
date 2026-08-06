@@ -12,7 +12,7 @@ The existing `DEFAULT_SETTINGS` in `src/lib/settings.js` is extended with three 
 keepPageBreaks: boolean  // default: false
 ```
 
-Preserve original PDF page breaks within chapters as CSS `page-break-before: always` markers in the EPUB output. When `false` (default), content flows continuously within chapters.
+Preserve original PDF page breaks as CSS `page-break-before: always` markers in the EPUB output. When `false` (default), content flows continuously.
 
 #### `pageHandling.removePageNumbers` (new)
 
@@ -44,7 +44,6 @@ CSS `text-align` for body paragraphs in the EPUB stylesheet.
 export const DEFAULT_SETTINGS = {
   structure: {
     detectHeadings: true,
-    detectToc: true,
     detectFootnotes: false,
     headingLevelThreshold: 3,
     paragraphDetection: true,
@@ -70,7 +69,6 @@ export const DEFAULT_SETTINGS = {
     pageRange: 'all',
     pageRangeFrom: null,
     pageRangeTo: null,
-    splitChaptersBy: 'heading1',
     keepPageBreaks: false,            // NEW
     removePageNumbers: true,          // NEW
     coverPage: 'auto',               // NEW
@@ -90,7 +88,6 @@ The persisted JSON mirrors `DEFAULT_SETTINGS`. Missing keys are filled with defa
 {
   "structure": {
     "detectHeadings": true,
-    "detectToc": true,
     "detectFootnotes": false,
     "headingLevelThreshold": 3,
     "paragraphDetection": true,
@@ -116,7 +113,6 @@ The persisted JSON mirrors `DEFAULT_SETTINGS`. Missing keys are filled with defa
     "pageRange": "all",
     "pageRangeFrom": null,
     "pageRangeTo": null,
-    "splitChaptersBy": "heading1",
     "keepPageBreaks": false,
     "removePageNumbers": true,
     "coverPage": "auto"
@@ -193,7 +189,6 @@ struct PageHandlingOptions {
     page_range: String,
     page_range_from: Option<u32>,
     page_range_to: Option<u32>,
-    split_chapters_by: String,
     keep_page_breaks: bool,          // NEW
     remove_page_numbers: bool,       // NEW
     cover_page: String,              // NEW: "auto" | "firstPage" | "none"

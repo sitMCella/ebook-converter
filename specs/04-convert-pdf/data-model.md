@@ -31,7 +31,6 @@ async fn convert_pdf(
 interface ConversionOptions {
   structure: {
     detectHeadings: boolean;
-    detectToc: boolean;
     detectFootnotes: boolean;
     headingLevelThreshold: number;
     paragraphDetection: boolean;
@@ -56,7 +55,6 @@ interface ConversionOptions {
     pageRange: "all" | "custom";
     pageRangeFrom: number | null;
     pageRangeTo: number | null;
-    splitChaptersBy: "heading1" | "heading2" | "pageBreak" | "none";
   };
   outputFolder: string;
 }
@@ -77,7 +75,6 @@ struct ConversionOptions {
 #[serde(rename_all = "camelCase")]
 struct StructureOptions {
     detect_headings: bool,
-    detect_toc: bool,
     detect_footnotes: bool,
     heading_level_threshold: u8,
     paragraph_detection: bool,
@@ -111,7 +108,6 @@ struct PageHandlingOptions {
     page_range: String,          // "all" | "custom"
     page_range_from: Option<u32>,
     page_range_to: Option<u32>,
-    split_chapters_by: String,   // "heading1" | "heading2" | "pageBreak" | "none"
 }
 ```
 
@@ -120,7 +116,6 @@ struct PageHandlingOptions {
 ```typescript
 interface ConversionResult {
   outputPath: string;
-  chapters: number;
   images: number;
   fileSize: number;
 }
@@ -131,7 +126,6 @@ interface ConversionResult {
 #[serde(rename_all = "camelCase")]
 struct ConversionResult {
     output_path: String,
-    chapters: usize,
     images: usize,
     file_size: u64,
 }
@@ -189,8 +183,6 @@ type ConversionStage =
   | "extracting_text"
   | "detecting_structure"
   | "extracting_images"
-  | "splitting_chapters"
-  | "generating_toc"
   | "assembling_epub"
   | "writing_file"
   | "complete"
@@ -256,7 +248,7 @@ interface ImportedFile {
   conversionProgress?: number;      // 0–100, present when status is "converting"
   conversionStage?: ConversionStage; // Current pipeline stage
   outputPath?: string;              // Absolute path to generated EPUB, present when status is "converted"
-  conversionResult?: ConversionResult; // Chapters, images, file size of output
+  conversionResult?: ConversionResult; // Images, file size of output
 }
 ```
 
@@ -411,7 +403,6 @@ Settings are stored as JSON in the Tauri app data directory. The frontend reads/
 interface PersistedSettings {
   structure: {
     detectHeadings: boolean;           // default: true
-    detectToc: boolean;                // default: true
     detectFootnotes: boolean;          // default: false
     headingLevelThreshold: number;     // default: 3
     paragraphDetection: boolean;       // default: true
@@ -436,7 +427,6 @@ interface PersistedSettings {
     pageRange: "all" | "custom";       // default: "all"
     pageRangeFrom: number | null;      // default: null
     pageRangeTo: number | null;        // default: null
-    splitChaptersBy: "heading1" | "heading2" | "pageBreak" | "none"; // default: "heading1"
   };
   outputLocation: {
     defaultFolder: string;             // default: "~/Documents/Ebooks"

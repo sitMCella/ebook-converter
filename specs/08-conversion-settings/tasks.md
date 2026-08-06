@@ -84,7 +84,6 @@
   - Confirmation dialog: "Reset all settings to factory defaults? Per-document overrides are not affected."
 - [ ] Implement Structure Detection group (left column):
   - Detect headings — Toggle (default ON)
-  - Detect table of contents — Toggle (default ON)
   - Detect footnotes — Toggle (default OFF)
   - Heading level threshold — Number input (1–6, default 3)
   - Paragraph detection — Toggle (default ON)
@@ -117,7 +116,6 @@
   - Page range — Dropdown: All / Custom (default All)
     - When "Custom" selected: two inline number inputs appear: "From page" and "To page"
     - "From page" wired to `pageRangeFrom`, "To page" wired to `pageRangeTo`
-  - Split chapters by — Dropdown: Heading level 1 / Heading level 2 / Page break / None (default Heading level 1)
   - Keep page breaks — Toggle (default OFF)
   - Remove page numbers — Toggle (default ON)
   - Cover page — Dropdown: Auto-detect / First page / None (default Auto-detect)
@@ -142,7 +140,6 @@
 ### T14: Cross-Setting Warning Toasts
 - [ ] When enabling "Convert to WebP" with EPUB 2 selected: toast warning "WebP images require EPUB 3. The EPUB version setting will be changed to EPUB 3."
 - [ ] When switching to EPUB 2 with "Convert to WebP" enabled: toast warning "WebP images are not supported in EPUB 2. Image conversion has been disabled."
-- [ ] When disabling "Detect headings" while "Split chapters by" is heading-based: toast warning "Chapter splitting by headings requires heading detection. Consider changing the split strategy." (advisory only — no automatic change)
 - [ ] Toast notifications use the existing `sonner` Toaster configured in `App.jsx`
 
 ### T15: Disabled Control State for Image Sub-Settings
@@ -205,7 +202,6 @@
 ### T21: E2E Tests
 - [ ] Test: navigate to Settings screen via sidebar — all controls render with default values
 - [ ] Test: toggle "Detect headings" OFF → verify the toggle reflects the new state
-- [ ] Test: change "Split chapters by" dropdown to "Page break" → verify selection
 - [ ] Test: enable "Keep page breaks" toggle → verify state
 - [ ] Test: set "Base font size" to 16 → verify the number input shows 16
 - [ ] Test: change "Page range" to Custom → verify From/To inputs appear
@@ -216,7 +212,7 @@
 ## Acceptance Criteria
 
 - [ ] The Settings screen replaces the placeholder at `/settings` with the full two-column settings grid
-- [ ] All 23 settings controls (6 structure + 4 images + 7 output + 6 page handling) render with correct defaults
+- [ ] All 20 settings controls (5 structure + 4 images + 7 output + 4 page handling) render with correct defaults
 - [ ] Changing any setting value persists it immediately to `settings.json` (in Tauri mode)
 - [ ] The save indicator briefly appears after each change
 - [ ] "Reset to defaults" restores all settings after confirmation dialog

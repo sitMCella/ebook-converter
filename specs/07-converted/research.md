@@ -6,7 +6,7 @@
 
 | Capability | Source | Notes |
 |---|---|---|
-| Converted file data | `ImportContext` + `BookMetadata` | Files with `status === 'converted'` have `outputPath` and `conversionResult` (chapters, images, fileSize); persisted to `metadata.json` via `saveBookMetadata` and restored on startup by `LOAD_LIBRARY` |
+| Converted file data | `ImportContext` + `BookMetadata` | Files with `status === 'converted'` have `outputPath` and `conversionResult` (images, fileSize); persisted to `metadata.json` via `saveBookMetadata` and restored on startup by `LOAD_LIBRARY` |
 | PDF source metadata | `ImportContext` file entries | Title, author, page count — carried over from import |
 | Per-document overrides | `ImportContext` file entries | `file.overrides` — shows which settings were customised |
 | File size formatting | `src/lib/format.js` | `formatFileSize()` |
@@ -21,7 +21,7 @@
 | Capability | Impact | Mitigation |
 |---|---|---|
 | ~~Shell plugin for opening files/folders~~ | ~~Resolved~~ | Shell plugin installed: `@tauri-apps/plugin-shell` (npm), `tauri-plugin-shell` (Cargo), registered in `lib.rs`, `shell:allow-open` capability granted. `openFileWithSystem()` and `openFolder()` bridge functions fully operational in Tauri mode; no-op in browser mode |
-| EPUB content parsing | Cannot render chapter preview or extract TOC | Show placeholder UI with book icon and chapter count |
+| EPUB content parsing | Cannot render content preview | Show cover image when available, or placeholder UI with book icon |
 | Conversion timestamp | Cannot show exact conversion date/time | Omit field initially; add `convertedAt` to `BookMetadata` and `SET_CONVERSION_RESULT` in a future enhancement |
 
 ## Two-Panel Layout Pattern (Reuse from Library)
@@ -81,7 +81,6 @@ To avoid name collisions with the Library screen components, Converted screen co
 - `EpubDetailPanel` (vs `DetailPanel`)
 - `EpubMetadata` (vs `MetadataSection`)
 - `EpubPreview` (vs `PagePreview`)
-- `TableOfContents` (unique to this screen)
 
 ## References
 

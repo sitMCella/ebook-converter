@@ -55,12 +55,6 @@ export function SettingsProvider({ children }) {
         }
       }
 
-      if (group === 'structure' && key === 'detectHeadings' && value === false) {
-        if (next.pageHandling.splitChaptersBy === 'heading1' || next.pageHandling.splitChaptersBy === 'heading2') {
-          toast.warning('Chapter splitting by headings requires heading detection. Consider changing the split strategy.');
-        }
-      }
-
       settingsRef.current = next;
       debouncedSave(next);
       return next;

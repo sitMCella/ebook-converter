@@ -13,33 +13,14 @@ describe('EpubPreview', () => {
   });
 
   it('shows placeholder when not in Tauri', () => {
-    const file = { conversionResult: { chapters: 10 } };
+    const file = { conversionResult: {} };
     render(<EpubPreview file={file} />);
     expect(screen.getByText('No cover image available')).toBeInTheDocument();
   });
 
-  it('shows plural chapter count in placeholder', () => {
-    const file = { conversionResult: { chapters: 23 } };
-    render(<EpubPreview file={file} />);
-    expect(screen.getByText('23 chapters')).toBeInTheDocument();
-  });
-
-  it('shows singular chapter count for one chapter', () => {
-    const file = { conversionResult: { chapters: 1 } };
-    render(<EpubPreview file={file} />);
-    expect(screen.getByText('1 chapter')).toBeInTheDocument();
-  });
-
-  it('hides chapter count when chapters is zero', () => {
-    const file = { conversionResult: { chapters: 0 } };
-    render(<EpubPreview file={file} />);
-    expect(screen.queryByText(/chapter/i)).not.toBeInTheDocument();
-  });
-
-  it('hides chapter count when conversionResult is missing', () => {
+  it('shows placeholder when conversionResult is missing', () => {
     const file = {};
     render(<EpubPreview file={file} />);
-    expect(screen.queryByText(/chapter/i)).not.toBeInTheDocument();
     expect(screen.getByText('No cover image available')).toBeInTheDocument();
   });
 });
@@ -54,7 +35,7 @@ describe('EpubPreview in Tauri', () => {
     tauri.isTauri = true;
     tauri.readEpubPreview.mockReturnValue(new Promise(() => {}));
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: { chapters: 5 } };
+    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
     render(<EpubPreview file={file} />);
     expect(screen.getByText('Loading preview...')).toBeInTheDocument();
 
@@ -68,7 +49,7 @@ describe('EpubPreview in Tauri', () => {
       coverImage: 'data:image/jpeg;base64,abc123',
     });
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: { chapters: 2 } };
+    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
     render(<EpubPreview file={file} />);
 
     await waitFor(() => {
@@ -88,14 +69,12 @@ describe('EpubPreview in Tauri', () => {
       coverImage: null,
     });
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: { chapters: 3 } };
+    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
     render(<EpubPreview file={file} />);
 
     await waitFor(() => {
       expect(screen.getByText('No cover image available')).toBeInTheDocument();
     });
-
-    expect(screen.getByText('3 chapters')).toBeInTheDocument();
 
     tauri.isTauri = false;
   });
@@ -105,7 +84,7 @@ describe('EpubPreview in Tauri', () => {
     tauri.isTauri = true;
     tauri.readEpubPreview.mockRejectedValue(new Error('Failed to read'));
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: { chapters: 3 } };
+    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
     render(<EpubPreview file={file} />);
 
     await waitFor(() => {

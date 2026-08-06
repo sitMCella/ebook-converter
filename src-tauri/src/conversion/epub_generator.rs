@@ -1,13 +1,12 @@
-use super::chapter_splitter::Chapter;
 use super::css;
 use super::image_extractor::ExtractedImage;
 use super::structure_detector::StructuredContent;
-use super::{ConversionOptions, ConversionResult, TocEntry};
+use super::{ConversionOptions, ConversionResult};
 use crate::pdf::PdfMetadata;
 use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
 
 pub fn generate_epub(
-    chapters: &[Chapter],
+    content: &[StructuredContent],
     images: &[ExtractedImage],
     cover_image: Option<&ExtractedImage>,
     metadata: &PdfMetadata,
@@ -98,21 +97,13 @@ pub fn generate_epub(
             .map_err(|e| format!("Failed to add image {}: {}", image.id, e))?;
     }
 
-    for (i, chapter) in chapters.iter().enumerate() {
-        let xhtml = chapter_to_xhtml(chapter, images);
-        let filename = format!("chapter{}.xhtml", i + 1);
-
-        let mut content = EpubContent::new(&filename, xhtml.as_bytes())
-            .title(&chapter.title);
-
-        if i == 0 {
-            content = content.reftype(ReferenceType::Text);
-        }
-
-        builder
-            .add_content(content)
-            .map_err(|e| format!("Failed to add chapter {}: {}", i + 1, e))?;
-    }
+    let xhtml = content_to_xhtml(content);
+    let epub_content = EpubContent::new("content.xhtml", xhtml.as_bytes())
+        .title(title)
+        .reftype(ReferenceType::Text);
+    builder
+        .add_content(epub_content)
+        .map_err(|e| format!("Failed to add content: {}", e))?;
 
     let mut output = Vec::new();
     builder
@@ -122,25 +113,15 @@ pub fn generate_epub(
     std::fs::write(output_path, &output)
         .map_err(|e| format!("Failed to write EPUB file: {}", e))?;
 
-    let toc: Vec<TocEntry> = chapters
-        .iter()
-        .map(|c| TocEntry {
-            title: c.title.clone(),
-            level: 1,
-        })
-        .collect();
-
     Ok(ConversionResult {
         output_path: output_path.to_string(),
-        chapters: chapters.len(),
         images: images.len(),
         file_size: output.len() as u64,
-        toc,
         has_cover,
     })
 }
 
-fn chapter_to_xhtml(chapter: &Chapter, _images: &[ExtractedImage]) -> String {
+fn content_to_xhtml(content: &[StructuredContent]) -> String {
     let mut html = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -150,25 +131,18 @@ fn chapter_to_xhtml(chapter: &Chapter, _images: &[ExtractedImage]) -> String {
 "#,
     );
 
-    content_to_xhtml(&chapter.content, &mut html);
-
-    html.push_str("</body>\n</html>");
-    html
-}
-
-fn content_to_xhtml(content: &[StructuredContent], html: &mut String) {
     let mut in_ul = false;
     let mut in_ol = false;
 
     for item in content {
         match item {
             StructuredContent::Heading { level, text } => {
-                close_lists(html, &mut in_ul, &mut in_ol);
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
                 let tag = format!("h{}", level.min(&6));
                 html.push_str(&format!("<{}>{}</{}>\n", tag, escape_xml(text), tag));
             }
             StructuredContent::Paragraph { text } => {
-                close_lists(html, &mut in_ul, &mut in_ol);
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
                 html.push_str(&format!("<p>{}</p>\n", escape_xml(text)));
             }
             StructuredContent::ListItem { text, ordered } => {
@@ -194,12 +168,15 @@ fn content_to_xhtml(content: &[StructuredContent], html: &mut String) {
                 html.push_str(&format!("<li>{}</li>\n", escape_xml(text)));
             }
             StructuredContent::BlankLine | StructuredContent::PageBreak => {
-                close_lists(html, &mut in_ul, &mut in_ol);
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
             }
         }
     }
 
-    close_lists(html, &mut in_ul, &mut in_ol);
+    close_lists(&mut html, &mut in_ul, &mut in_ol);
+
+    html.push_str("</body>\n</html>");
+    html
 }
 
 fn close_lists(html: &mut String, in_ul: &mut bool, in_ol: &mut bool) {
@@ -230,7 +207,6 @@ mod tests {
         ConversionOptions {
             structure: StructureOptions {
                 detect_headings: true,
-                detect_toc: false,
                 detect_footnotes: false,
                 heading_level_threshold: 3,
                 paragraph_detection: true,
@@ -256,7 +232,6 @@ mod tests {
                 page_range: "all".to_string(),
                 page_range_from: None,
                 page_range_to: None,
-                split_chapters_by: "heading1".to_string(),
                 keep_page_breaks: false,
                 remove_page_numbers: true,
                 cover_page: "auto".to_string(),
@@ -288,12 +263,8 @@ mod tests {
         buf.into_inner()
     }
 
-    fn make_chapter(title: &str, text: &str) -> Chapter {
-        Chapter {
-            title: title.to_string(),
-            content: vec![StructuredContent::Paragraph { text: text.to_string() }],
-            images: vec![],
-        }
+    fn make_content(text: &str) -> Vec<StructuredContent> {
+        vec![StructuredContent::Paragraph { text: text.to_string() }]
     }
 
     fn make_cover(mime: &str) -> ExtractedImage {
@@ -312,8 +283,8 @@ mod tests {
     fn generate_epub_without_cover_sets_has_cover_false() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("test.epub");
-        let chapters = vec![make_chapter("Chapter 1", "Hello")];
-        let result = generate_epub(&chapters, &[], None, &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let content = make_content("Hello");
+        let result = generate_epub(&content, &[], None, &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(!result.has_cover);
     }
 
@@ -321,9 +292,9 @@ mod tests {
     fn generate_epub_with_cover_sets_has_cover_true() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("test.epub");
-        let chapters = vec![make_chapter("Chapter 1", "Hello")];
+        let content = make_content("Hello");
         let cover = make_cover("image/jpeg");
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(result.has_cover);
     }
 
@@ -333,8 +304,8 @@ mod tests {
     fn generate_epub_creates_file_without_cover() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("no_cover.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
-        generate_epub(&chapters, &[], None, &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let content = make_content("Text");
+        generate_epub(&content, &[], None, &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(output.exists());
         assert!(std::fs::metadata(&output).unwrap().len() > 0);
     }
@@ -343,9 +314,9 @@ mod tests {
     fn generate_epub_creates_file_with_cover() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("with_cover.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
+        let content = make_content("Text");
         let cover = make_cover("image/jpeg");
-        generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(output.exists());
         assert!(std::fs::metadata(&output).unwrap().len() > 0);
     }
@@ -355,12 +326,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
 
         let no_cover_path = dir.path().join("no_cover.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
-        let r1 = generate_epub(&chapters, &[], None, &test_metadata(), &test_options(), no_cover_path.to_str().unwrap()).unwrap();
+        let content = make_content("Text");
+        let r1 = generate_epub(&content, &[], None, &test_metadata(), &test_options(), no_cover_path.to_str().unwrap()).unwrap();
 
         let with_cover_path = dir.path().join("with_cover.epub");
         let cover = make_cover("image/jpeg");
-        let r2 = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), with_cover_path.to_str().unwrap()).unwrap();
+        let r2 = generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), with_cover_path.to_str().unwrap()).unwrap();
 
         assert!(r2.file_size > r1.file_size);
     }
@@ -371,9 +342,9 @@ mod tests {
     fn generate_epub_with_png_cover() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("png_cover.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
+        let content = make_content("Text");
         let cover = make_cover("image/png");
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(result.has_cover);
         assert!(output.exists());
     }
@@ -382,47 +353,19 @@ mod tests {
     fn generate_epub_with_webp_cover() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("webp_cover.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
+        let content = make_content("Text");
         let cover = make_cover("image/webp");
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(result.has_cover);
     }
 
     // -- result stats --
 
     #[test]
-    fn result_chapter_count_excludes_cover() {
-        let dir = tempfile::tempdir().unwrap();
-        let output = dir.path().join("test.epub");
-        let chapters = vec![
-            make_chapter("Ch1", "First"),
-            make_chapter("Ch2", "Second"),
-        ];
-        let cover = make_cover("image/jpeg");
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
-        assert_eq!(result.chapters, 2);
-    }
-
-    #[test]
-    fn result_toc_entries_match_chapters() {
-        let dir = tempfile::tempdir().unwrap();
-        let output = dir.path().join("test.epub");
-        let chapters = vec![
-            make_chapter("Alpha", "Text"),
-            make_chapter("Beta", "Text"),
-        ];
-        let cover = make_cover("image/jpeg");
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
-        assert_eq!(result.toc.len(), 2);
-        assert_eq!(result.toc[0].title, "Alpha");
-        assert_eq!(result.toc[1].title, "Beta");
-    }
-
-    #[test]
     fn result_image_count_excludes_cover() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("test.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
+        let content = make_content("Text");
         let body_images = vec![ExtractedImage {
             id: "body_img".to_string(),
             data: create_minimal_jpeg(),
@@ -431,7 +374,7 @@ mod tests {
             height: 200,
         }];
         let cover = make_cover("image/jpeg");
-        let result = generate_epub(&chapters, &body_images, Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let result = generate_epub(&content, &body_images, Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert_eq!(result.images, 1);
     }
 
@@ -441,11 +384,11 @@ mod tests {
     fn generate_epub2_with_cover() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("epub2_cover.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
+        let content = make_content("Text");
         let cover = make_cover("image/jpeg");
         let mut opts = test_options();
         opts.output.epub_version = "epub2".to_string();
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
+        let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
         assert!(result.has_cover);
         assert!(output.exists());
     }
@@ -456,9 +399,9 @@ mod tests {
     fn result_output_path_matches_input() {
         let dir = tempfile::tempdir().unwrap();
         let output = dir.path().join("specific_name.epub");
-        let chapters = vec![make_chapter("Ch1", "Text")];
+        let content = make_content("Text");
         let cover = make_cover("image/jpeg");
-        let result = generate_epub(&chapters, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert_eq!(result.output_path, output.to_str().unwrap());
     }
 }

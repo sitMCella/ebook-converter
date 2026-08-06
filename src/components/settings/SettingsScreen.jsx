@@ -24,12 +24,6 @@ const IMAGE_QUALITY_OPTIONS = [
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
 ];
-const SPLIT_OPTIONS = [
-  { value: 'heading1', label: 'Heading level 1' },
-  { value: 'heading2', label: 'Heading level 2' },
-  { value: 'pageBreak', label: 'Page break' },
-  { value: 'none', label: 'None' },
-];
 const PAGE_RANGE_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'custom', label: 'Custom' },
@@ -86,14 +80,6 @@ export function SettingsScreen() {
                 checked={settings.structure.detectHeadings}
                 onChange={(v) => handleChange('structure', 'detectHeadings', v)}
                 label="Detect headings"
-              />
-            </SettingRow>
-            <SettingRow label="Detect table of contents">
-              <SaveIndicator visible={lastChanged === 'structure.detectToc'} />
-              <Toggle
-                checked={settings.structure.detectToc}
-                onChange={(v) => handleChange('structure', 'detectToc', v)}
-                label="Detect table of contents"
               />
             </SettingRow>
             <SettingRow label="Detect footnotes">
@@ -310,18 +296,6 @@ export function SettingsScreen() {
                 </div>
               </SettingRow>
             )}
-            <SettingRow label="Split chapters by">
-              <SaveIndicator visible={lastChanged === 'pageHandling.splitChaptersBy'} />
-              <select
-                value={settings.pageHandling.splitChaptersBy}
-                onChange={(e) => handleChange('pageHandling', 'splitChaptersBy', e.target.value)}
-                className={selectClass}
-              >
-                {SPLIT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </SettingRow>
             <SettingRow label="Keep page breaks">
               <SaveIndicator visible={lastChanged === 'pageHandling.keepPageBreaks'} />
               <Toggle

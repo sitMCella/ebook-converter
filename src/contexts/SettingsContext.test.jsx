@@ -31,7 +31,6 @@ function TestConsumer() {
       <span data-testid="convert-webp">{settings.images.convertToWebP.toString()}</span>
       <span data-testid="text-alignment">{settings.output.textAlignment}</span>
       <span data-testid="keep-page-breaks">{settings.pageHandling.keepPageBreaks.toString()}</span>
-      <span data-testid="split-chapters">{settings.pageHandling.splitChaptersBy}</span>
       <button data-testid="toggle-headings" onClick={() => updateSetting('structure', 'detectHeadings', false)}>
         Toggle
       </button>
@@ -40,9 +39,6 @@ function TestConsumer() {
       </button>
       <button data-testid="set-epub2" onClick={() => updateSetting('output', 'epubVersion', 'epub2')}>
         Set EPUB 2
-      </button>
-      <button data-testid="set-split-heading2" onClick={() => updateSetting('pageHandling', 'splitChaptersBy', 'heading2')}>
-        Split Heading 2
       </button>
       <button data-testid="reset" onClick={resetToDefaults}>
         Reset
@@ -144,47 +140,6 @@ describe('SettingsContext', () => {
       () => expect(saveSettings).toHaveBeenCalled(),
       { timeout: 500 },
     );
-  });
-
-  it('disabling detect headings with heading-based split emits advisory warning', async () => {
-    const { toast } = await import('sonner');
-    await renderWithProvider();
-
-    expect(screen.getByTestId('split-chapters')).toHaveTextContent('heading1');
-
-    await act(async () => {
-      await userEvent.click(screen.getByTestId('toggle-headings'));
-    });
-    expect(screen.getByTestId('detect-headings')).toHaveTextContent('false');
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Chapter splitting by headings requires heading detection'),
-    );
-  });
-
-  it('disabling detect headings with heading2 split also emits advisory warning', async () => {
-    const { toast } = await import('sonner');
-    await renderWithProvider();
-
-    await act(async () => {
-      await userEvent.click(screen.getByTestId('set-split-heading2'));
-    });
-    expect(screen.getByTestId('split-chapters')).toHaveTextContent('heading2');
-
-    await act(async () => {
-      await userEvent.click(screen.getByTestId('toggle-headings'));
-    });
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Chapter splitting by headings requires heading detection'),
-    );
-  });
-
-  it('heading detection warning is advisory only — does not change splitChaptersBy', async () => {
-    await renderWithProvider();
-
-    await act(async () => {
-      await userEvent.click(screen.getByTestId('toggle-headings'));
-    });
-    expect(screen.getByTestId('split-chapters')).toHaveTextContent('heading1');
   });
 
   it('loads settings from disk on mount', async () => {

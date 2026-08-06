@@ -25,9 +25,7 @@ The Rust backend performs conversion in the following stages:
 1. **Text extraction** — Extract text content from each PDF page. Split by page boundaries.
 2. **Structure detection** — Identify headings, paragraphs, lists, and footnotes using text heuristics. Configurable via settings.
 3. **Image extraction** — Extract embedded images from the PDF. Optionally resize and re-encode. Configurable via settings.
-4. **Chapter splitting** — Divide content into EPUB chapters based on the configured split strategy (heading level 1, heading level 2, page break, or none).
-5. **TOC generation** — Build a table of contents from detected headings.
-6. **EPUB assembly** — Generate the EPUB file with metadata, chapters, images, CSS, and navigation. Write to the output folder.
+4. **EPUB assembly** — Generate the EPUB file with metadata, structured content, images, CSS, and navigation. Write to the output folder.
 
 ### FR-4: Progress Reporting
 
@@ -47,7 +45,6 @@ The frontend displays progress on the Converting screen:
 The Converting screen includes a log panel showing real-time output from the conversion engine. Log entries include:
 - `Extracting text from pages N–M...`
 - `Detecting headings and structure...`
-- `Rebuilding table of contents...`
 - `Extracting images (X of Y)...`
 - `Generating EPUB structure...`
 - `Writing EPUB file...`
@@ -93,10 +90,10 @@ The output EPUB file is named after the source PDF file, with the extension chan
 Conversion uses the effective settings for each document, computed by merging per-document overrides on top of global defaults (see spec 02 "Settings Architecture"). The conversion command receives the full resolved settings as a parameter.
 
 Applicable setting groups:
-- **Structure detection**: detect headings, detect TOC, detect footnotes, heading level threshold, paragraph detection, list detection.
+- **Structure detection**: detect headings, detect footnotes, heading level threshold, paragraph detection, list detection.
 - **Images**: extract images, image quality, max image width, convert to WebP.
 - **Output format**: EPUB version, embed fonts, font family, base font size, line height, margins.
-- **Page handling**: skip blank pages, page range, split chapters by.
+- **Page handling**: skip blank pages, page range.
 - **Output location**: default output folder (global only).
 
 ## Non-Functional Requirements
@@ -115,8 +112,7 @@ Generated EPUBs must:
 - Be valid EPUB 2 or EPUB 3 files (pass basic structural validation).
 - Render correctly in major e-reader apps (Apple Books, Calibre, Kobo, Kindle via conversion).
 - Preserve the reading order of the source PDF.
-- Include a navigable table of contents.
-- Use semantic HTML (`<h1>`–`<h6>`, `<p>`, `<ul>`, `<ol>`, `<img>`) in chapter XHTML files.
+- Use semantic HTML (`<h1>`–`<h6>`, `<p>`, `<ul>`, `<ol>`, `<img>`) in the content XHTML file.
 
 ### NFR-4: Disk Space
 

@@ -182,7 +182,7 @@ async function readEpubPreview(path) {
     const { invoke } = await import('@tauri-apps/api/core');
     return invoke('read_epub_preview', { path });
   }
-  return { chapters: [], coverImage: null };
+  return { coverImage: null };
 }
 
 async function openFileWithSystem(path) {

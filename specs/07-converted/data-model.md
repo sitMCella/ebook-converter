@@ -6,7 +6,7 @@ The Converted screen reads from the existing `ImportContext` state. No new reduc
 
 ### Persistence
 
-Converted file data is persisted to disk via `BookMetadata` in the Rust backend. When a conversion completes, `useConversion` calls `saveBookMetadata` to update the book's `metadata.json` with `status: 'converted'` and the conversion result fields (`outputPath`, `chapters`, `images`, `epubFileSize`). On app startup, the `LOAD_LIBRARY` reducer action restores `outputPath` and `conversionResult` from the loaded metadata for books with `status === 'converted'`.
+Converted file data is persisted to disk via `BookMetadata` in the Rust backend. When a conversion completes, `useConversion` calls `saveBookMetadata` to update the book's `metadata.json` with `status: 'converted'` and the conversion result fields (`outputPath`, `images`, `epubFileSize`). On app startup, the `LOAD_LIBRARY` reducer action restores `outputPath` and `conversionResult` from the loaded metadata for books with `status === 'converted'`.
 
 #### BookMetadata — Conversion Fields
 
@@ -14,7 +14,6 @@ The Rust `BookMetadata` struct includes these optional fields for conversion res
 
 ```rust
 pub output_path: Option<String>,
-pub chapters: Option<usize>,
 pub images: Option<usize>,
 pub epub_file_size: Option<u64>,
 ```
@@ -47,7 +46,6 @@ Files with `status === 'converted'` have the following fields (set by `SET_CONVE
   outputPath: string,        // Absolute path to generated EPUB
   conversionResult: {
     outputPath: string,
-    chapters: number,         // Number of EPUB chapters
     images: number,           // Number of extracted images
     fileSize: number,         // EPUB file size in bytes
   },
@@ -100,14 +98,6 @@ No props — reads from ImportContext and React Router.
 ```
 
 ### EpubMetadata
-
-```javascript
-{
-  file: ConvertedFile,
-}
-```
-
-### TableOfContents
 
 ```javascript
 {

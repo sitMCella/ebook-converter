@@ -11,7 +11,7 @@
 ### T2: Conversion Data Types
 - [ ] Create `src-tauri/src/conversion/mod.rs` — module root, re-exports
 - [ ] Define `ConversionOptions` struct with nested `StructureOptions`, `ImageOptions`, `OutputOptions`, `PageHandlingOptions` — all `Deserialize` with `camelCase`
-- [ ] Define `ConversionResult` struct (`output_path`, `chapters`, `images`, `file_size`) — `Serialize` with `camelCase`
+- [ ] Define `ConversionResult` struct (`output_path`, `images`, `file_size`) — `Serialize` with `camelCase`
 - [ ] Define `ConversionProgress` struct (`path`, `stage`, `percent`, `message`) — `Serialize` with `camelCase`
 - [ ] Define `ConversionState` struct with `cancel_tokens: Mutex<HashMap<String, Arc<AtomicBool>>>`
 
@@ -48,29 +48,18 @@
 - [ ] Define `ExtractedImage` struct: `{ id: String, data: Vec<u8>, mime_type: String, width: u32, height: u32 }`
 - [ ] Skip unsupported image formats (JPEG2000, JBIG2) with a warning log
 
-### T6: Chapter Splitter Module
-- [ ] Create `src-tauri/src/conversion/chapter_splitter.rs`
-- [ ] Define `Chapter` struct: `{ title: String, content: Vec<StructuredContent>, images: Vec<String> }`
-- [ ] Implement `split_chapters(content: Vec<StructuredContent>, options: &PageHandlingOptions) -> Vec<Chapter>`:
-  - `heading1`: split at every `Heading { level: 1 }` — the heading becomes the chapter title
-  - `heading2`: split at every `Heading { level: 1 | 2 }`
-  - `pageBreak`: split at page boundaries preserved from text extraction
-  - `none`: all content in a single chapter
-  - If no headings found and strategy is heading-based, fall back to a single chapter
-  - Assign a default title ("Chapter N") when a chapter has no heading
-
-### T7: EPUB Generator Module
+### T6: EPUB Generator Module
 - [ ] Create `src-tauri/src/conversion/epub_generator.rs`
 - [ ] Create `src-tauri/src/conversion/css.rs`
 - [ ] Implement `generate_css(options: &OutputOptions) -> String`:
   - Generate CSS based on font family, font size, line height, margins settings
   - Include heading styles, paragraph styles, list styles, image styles
-- [ ] Implement `generate_epub(chapters: &[Chapter], images: &[ExtractedImage], metadata: &PdfMetadata, options: &ConversionOptions, output_path: &str) -> Result<ConversionResult, String>`:
+- [ ] Implement `generate_epub(content: &[StructuredContent], images: &[ExtractedImage], metadata: &PdfMetadata, options: &ConversionOptions, output_path: &str) -> Result<ConversionResult, String>`:
   - Create `EpubBuilder` with `ZipLibrary`
   - Set EPUB version from `options.output.epubVersion`
   - Set metadata (title from PDF metadata or filename, author)
   - Add generated CSS stylesheet
-  - For each chapter: convert `StructuredContent` to XHTML, add as `EpubContent` with title
+  - Convert all `StructuredContent` to XHTML and add as a single `content.xhtml` file
   - For each image: add as resource with correct MIME type
   - Generate the EPUB to a `Vec<u8>`
   - Write to `output_path`
@@ -82,21 +71,20 @@
   - `ListItem { ordered: true }` → `<ol><li>`
   - Image references → `<img src="..." alt="" />`
 
-### T8: Conversion Pipeline
+### T7: Conversion Pipeline
 - [ ] Create `src-tauri/src/conversion/pipeline.rs`
 - [ ] Implement `run_conversion(app: &AppHandle, path: &str, options: &ConversionOptions, cancel_token: Arc<AtomicBool>) -> Result<ConversionResult, String>`:
   - Emit progress at each stage transition
   - Stage 1 (0–40%): call `extract_text`, emit page-level progress
-  - Stage 2 (40–50%): call `detect_structure`
-  - Stage 3 (50–70%): call `extract_images` if enabled, emit per-image progress
-  - Stage 4 (70–80%): call `split_chapters`
-  - Stage 5 (80–95%): call `generate_epub`
-  - Stage 6 (95–100%): write file, emit completion
+  - Stage 2 (40–55%): call `detect_structure`
+  - Stage 3 (55–75%): call `extract_images` if enabled, emit per-image progress
+  - Stage 4 (75–95%): call `generate_epub`
+  - Stage 5 (95–100%): write file, emit completion
   - Check `cancel_token` between stages — if cancelled, clean up and return error
   - Resolve output file path (handle existing file name collision)
 - [ ] Implement output path resolution: base name from PDF, `.epub` extension, numeric suffix if exists
 
-### T9: IPC Commands
+### T8: IPC Commands
 - [ ] Add `convert_pdf` async command in `src-tauri/src/conversion/mod.rs`:
   - Register cancel token in `ConversionState`
   - Call `run_conversion`
@@ -107,19 +95,18 @@
   - Set the atomic bool to `true`
 - [ ] Register both commands and `ConversionState` in `src-tauri/src/lib.rs`
 
-### T10: Rust Unit Tests
+### T9: Rust Unit Tests
 - [ ] Add test PDFs to `src-tauri/tests/fixtures/` (text-only, with images, multi-page)
 - [ ] Test `extract_text` returns per-page text for a known PDF
 - [ ] Test `detect_structure` identifies headings, paragraphs, and lists from sample text
-- [ ] Test `split_chapters` with heading1 strategy produces correct chapter boundaries
 - [ ] Test `generate_epub` produces a valid EPUB file (check ZIP structure, verify mimetype, content.opf exists)
-- [ ] Test `run_conversion` end-to-end with a simple PDF → verify EPUB output exists and has expected chapter count
+- [ ] Test `run_conversion` end-to-end with a simple PDF → verify EPUB output exists
 - [ ] Test cancellation — start conversion, cancel immediately, verify partial output is cleaned up
 - [ ] Test output path resolution — existing file produces `(1)` suffix
 
 ## Phase 2: Frontend — Tauri Bridge Extensions
 
-### T11: Extend Tauri Bridge
+### T10: Extend Tauri Bridge
 - [ ] Add `convertPdfToEpub(path, options)` to `src/lib/tauri.js`:
   - Calls `invoke('convert_pdf', { path, options })`
   - Browser fallback: returns a rejected promise with "Conversion requires the desktop app"
@@ -130,7 +117,7 @@
   - Returns the unlisten function
   - Browser fallback: returns a no-op unlisten function
 
-### T12: Settings Module
+### T11: Settings Module
 - [ ] Create `src/lib/settings.js`:
   - `DEFAULT_SETTINGS` object with all default values per spec 02
   - `loadSettings()` — reads `settings.json` from app data dir via Tauri FS plugin; returns defaults if file missing
@@ -141,7 +128,7 @@
 
 ## Phase 3: Frontend — State Management
 
-### T13: Extend ImportContext
+### T12: Extend ImportContext
 - [ ] Add `SET_CONVERSION_PROGRESS` action to the reducer in `src/contexts/ImportContext.jsx`:
   - Updates `conversionProgress` and `conversionStage` fields on the file
 - [ ] Add `SET_CONVERSION_RESULT` action:
@@ -149,14 +136,14 @@
   - Sets status to `converted`
 - [ ] Ensure `UPDATE_STATUS` clears conversion fields when setting status back to `ready` or `error`
 
-### T14: Create ConversionContext
+### T13: Create ConversionContext
 - [ ] Create `src/contexts/ConversionContext.jsx`:
   - State: `queue`, `activeFile`, `completedFiles`, `logEntries`, `isComplete`
   - Actions: `ENQUEUE_FILES`, `START_NEXT`, `COMPLETE_ACTIVE`, `FAIL_ACTIVE`, `CANCEL_ALL`, `ADD_LOG_ENTRY`, `CLEAR_LOG`
   - Provider component
 - [ ] Add `ConversionContext.Provider` to `App.jsx`
 
-### T15: Conversion Orchestration Hook
+### T14: Conversion Orchestration Hook
 - [ ] Create `src/hooks/useConversion.js`:
   - `startConversion(paths)`:
     1. Load effective settings for each file (global + per-document overrides)
@@ -176,14 +163,14 @@
 
 ## Phase 4: Frontend — Converting Screen UI
 
-### T16: ProgressBar Component
+### T15: ProgressBar Component
 - [ ] Create `src/components/conversion/ProgressBar.jsx`:
   - 4 px height, rounded (2 px radius)
   - Accent colour fill, border colour track
   - `aria-valuenow`, `aria-valuemin="0"`, `aria-valuemax="100"`, `aria-label`
   - Accepts `percent` prop (0–100)
 
-### T17: ConversionQueueRow Component
+### T16: ConversionQueueRow Component
 - [ ] Create `src/components/conversion/ConversionQueueRow.jsx`:
   - PDF file icon
   - File name (weight 500)
@@ -191,13 +178,13 @@
   - Status badge: `Converting` (warning) or `Pending` (accent)
   - ProgressBar below the row (only for the active file)
 
-### T18: ConversionQueue Component
+### T17: ConversionQueue Component
 - [ ] Create `src/components/conversion/ConversionQueue.jsx`:
   - Renders active file row with progress bar
   - Renders queued file rows with "Queued" label and "Pending" badge
   - Uses ConversionContext to determine queue state
 
-### T19: ConversionLog Component
+### T18: ConversionLog Component
 - [ ] Create `src/components/conversion/ConversionLog.jsx`:
   - Bordered panel with info icon + "Conversion log" header (weight 500)
   - Monospace text (12 px, muted colour) for log entries
@@ -206,14 +193,14 @@
   - `aria-live="polite"` region for screen reader announcements
   - Uses ConversionContext `logEntries`
 
-### T20: CompletedList Component
+### T19: CompletedList Component
 - [ ] Create `src/components/conversion/CompletedList.jsx`:
   - "Completed" muted label header
   - Each row: check icon (success colour), file name, `Converted` status badge
   - Clicking a completed row navigates to `/converted`
   - Uses ConversionContext `completedFiles`
 
-### T21: ConvertingScreen Assembly
+### T20: ConvertingScreen Assembly
 - [ ] Create `src/components/conversion/ConvertingScreen.jsx`:
   - Header: "Converting" title (h3) or "Conversion complete" when done
   - "Cancel all" secondary button (right-aligned) — visible when active/queued files exist
@@ -224,33 +211,33 @@
   - ConversionLog section
   - CompletedList section
 
-### T22: Routing and Navigation
+### T21: Routing and Navigation
 - [ ] Add `/converting` route in `src/App.jsx` pointing to `ConvertingScreen`
 - [ ] Update `BatchActions.jsx`: "Convert selected" button calls `startConversion(selectedPaths)` from useConversion and navigates to `/converting`
 - [ ] Add "Converting" option to sidebar navigation (or reuse "Converted" with a dynamic label based on active state)
 
 ## Phase 5: Wiring and Integration
 
-### T23: Wire BatchActions to Conversion
+### T22: Wire BatchActions to Conversion
 - [ ] Update `src/components/import/BatchActions.jsx`:
   - On "Convert selected" click: collect selected paths with status `ready`
   - Call `startConversion(paths)` from useConversion hook
   - Navigate to `/converting`
 - [ ] Update ImportContext: set status to `converting` for all queued files
 
-### T24: Output Folder Handling
+### T23: Output Folder Handling
 - [ ] On conversion start, verify the output folder exists via Tauri FS plugin
 - [ ] If the folder does not exist, show toast: "The output folder no longer exists. Please choose a new one in Settings." and abort
 - [ ] Create the output folder if it does not exist (using `fs:allow-mkdir` capability)
 - [ ] Default output folder: resolve `~/Documents/Ebooks` to the platform-specific absolute path
 
-### T25: Disk Space Check
+### T24: Disk Space Check
 - [ ] Before starting conversion, estimate output size (rough heuristic: input PDF size × 0.3 for text-heavy, × 0.8 for image-heavy)
 - [ ] If estimated output exceeds available disk space, show danger toast and abort
 
 ## Phase 6: Testing
 
-### T26: Frontend Unit Tests
+### T25: Frontend Unit Tests
 - [ ] Test `ConversionContext` reducer: ENQUEUE_FILES, START_NEXT, COMPLETE_ACTIVE, FAIL_ACTIVE, CANCEL_ALL, ADD_LOG_ENTRY
 - [ ] Test `ImportContext` extended reducer: SET_CONVERSION_PROGRESS, SET_CONVERSION_RESULT
 - [ ] Test `mergeSettings` correctly deep-merges overrides
@@ -259,17 +246,17 @@
 - [ ] Test ConversionLog auto-scrolls on new entries
 - [ ] Test CompletedList renders completed files with correct badges
 
-### T27: E2E Tests
+### T26: E2E Tests
 - [ ] Test full conversion flow: import a PDF → select → click "Convert selected" → verify Converting screen shows progress → verify completion
 - [ ] Test cancellation: start conversion → click "Cancel all" → verify confirmation dialog → confirm → verify queue cleared
 - [ ] Test error handling: import a corrupted PDF → attempt conversion → verify error badge and log entry
 - [ ] Test batch conversion: import 3 PDFs → convert all → verify sequential processing and completion
 
-### T28: Integration Tests (Rust)
+### T27: Integration Tests (Rust)
 - [ ] Test `convert_pdf` IPC command end-to-end with a test PDF
 - [ ] Verify the output EPUB file is a valid ZIP with correct mimetype
-- [ ] Verify the EPUB contains expected chapters and metadata
-- [ ] Test conversion with different option combinations (skip images, custom page range, heading2 split)
+- [ ] Verify the EPUB contains expected content and metadata
+- [ ] Test conversion with different option combinations (skip images, custom page range)
 - [ ] Test cancellation mid-conversion
 
 ## Acceptance Criteria
@@ -284,7 +271,7 @@
 - [ ] A conversion error for one file does not stop the remaining queue
 - [ ] Error files show an `Error` badge with an expandable error detail
 - [ ] The generated EPUB file exists at the configured output folder with the correct name
-- [ ] The EPUB contains chapters split by the configured strategy with a navigable table of contents
+- [ ] The EPUB contains all structured content in a single content file
 - [ ] Images are extracted and embedded (when the setting is enabled) at the configured quality and max width
 - [ ] The EPUB CSS reflects the configured font family, font size, line height, and margins
 - [ ] The status badge on the import list updates in real time during conversion (Ready → Converting → Converted)

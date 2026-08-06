@@ -6,7 +6,7 @@ Provide a dedicated screen for browsing, inspecting, and managing converted EPUB
 
 ## Background
 
-The conversion pipeline (spec 04) produces EPUB files from imported PDFs. Once conversion completes, the file's status changes to `converted` and a `conversionResult` object is stored on the file entry in `ImportContext` (containing `outputPath`, `chapters`, `images`, `fileSize`). The conversion result is also persisted to the book's `metadata.json` on disk so that converted files survive app restarts. On startup, `LOAD_LIBRARY` restores the conversion result data for books with `status === 'converted'`. The Converting screen (spec 04) already links completed files to `/converted`, but that route currently renders a placeholder. This spec replaces the placeholder with a full Converted screen following the UI/UX design spec (Screen 4).
+The conversion pipeline (spec 04) produces EPUB files from imported PDFs. Once conversion completes, the file's status changes to `converted` and a `conversionResult` object is stored on the file entry in `ImportContext` (containing `outputPath`, `images`, `fileSize`). The conversion result is also persisted to the book's `metadata.json` on disk so that converted files survive app restarts. On startup, `LOAD_LIBRARY` restores the conversion result data for books with `status === 'converted'`. The Converting screen (spec 04) already links completed files to `/converted`, but that route currently renders a placeholder. This spec replaces the placeholder with a full Converted screen following the UI/UX design spec (Screen 4).
 
 The Converted screen mirrors the Library screen (spec 06) layout — a two-panel master-detail view — but shows EPUB-specific information instead of PDF source metadata.
 
@@ -27,7 +27,7 @@ A search input in the header filters the EPUB list by file name in real time (ca
 
 ### FR-3: Detail Panel — EPUB Preview (Deferred)
 
-A rendered preview of EPUB chapter content. This requires parsing EPUB HTML content and rendering it in a sandboxed container, which is complex and out of scope for the initial implementation. The UI shows a placeholder indicating preview is not yet available, similar to the Library page preview placeholder.
+A rendered preview of EPUB content. This requires parsing EPUB HTML content and rendering it in a sandboxed container, which is complex and out of scope for the initial implementation. The UI shows the cover image if available, or a "No cover image available" placeholder otherwise.
 
 ### FR-4: Detail Panel — Metadata
 
@@ -37,40 +37,35 @@ When an EPUB is selected, the detail panel shows a labelled list of EPUB-specifi
 |---|---|---|
 | Source | Original PDF file name | Design patterns.pdf |
 | EPUB size | `conversionResult.fileSize` | 3.1 MB |
-| Chapters | `conversionResult.chapters` | 23 |
 | Images | `conversionResult.images` | 47 extracted |
 | Converted | Conversion timestamp | 2026-08-02 14:32 |
 
 If a metadata field is absent or zero, the row is hidden.
 
-### FR-5: Detail Panel — Table of Contents (Deferred)
-
-A collapsible section showing the EPUB's generated TOC as an indented, clickable list. This requires parsing the EPUB's NCX/nav document, which is deferred. The UI shows the collapsed section header as a placeholder: "Table of contents" with a note that it is not yet available when expanded.
-
-### FR-6: Detail Panel — Action Buttons
+### FR-5: Detail Panel — Action Buttons
 
 Stacked vertically, full width, below the metadata:
 
 1. **"Open in reader"** — primary button, `ExternalLink` icon. Opens the EPUB file in the system's default EPUB reader application via a Tauri shell command. In browser mode, triggers a download.
 2. **"Reconvert"** — secondary button, `RefreshCw` icon. Navigates to the Library screen with the source PDF selected and the conversion options panel expanded.
 
-### FR-7: Header — Open Folder
+### FR-6: Header — Open Folder
 
 The header contains a "Open folder" secondary button with a `FolderOpen` icon. Opens the output folder in the OS file manager. In browser mode, this button is hidden.
 
-### FR-8: Empty State
+### FR-7: Empty State
 
 When no files have been converted, the screen shows: "No converted files yet. Import and convert a PDF to see it here." with a "Go to Import" button that navigates to `/import`.
 
-### FR-9: Persistence Across Restarts
+### FR-8: Persistence Across Restarts
 
-Converted EPUB data persists across app restarts. When conversion completes, `useConversion` updates the book's `metadata.json` via `saveBookMetadata` with `status: 'converted'` and the conversion result fields (`outputPath`, `chapters`, `images`, `epubFileSize`). On startup, `listBooks()` loads these metadata files and the `LOAD_LIBRARY` reducer restores `outputPath` and `conversionResult` on the file entry, so the Converted screen displays previously converted files without requiring reconversion.
+Converted EPUB data persists across app restarts. When conversion completes, `useConversion` updates the book's `metadata.json` via `saveBookMetadata` with `status: 'converted'` and the conversion result fields (`outputPath`, `images`, `epubFileSize`). On startup, `listBooks()` loads these metadata files and the `LOAD_LIBRARY` reducer restores `outputPath` and `conversionResult` on the file entry, so the Converted screen displays previously converted files without requiring reconversion.
 
-### FR-10: Navigation from Converting Screen
+### FR-9: Navigation from Converting Screen
 
 Clicking a completed row in the Converting screen navigates to `/converted` with the EPUB pre-selected via React Router location state (`{ selectedPath }`).
 
-### FR-11: Navigation from Sidebar
+### FR-10: Navigation from Sidebar
 
 The "Converted" sidebar item navigates to `/converted`. The active state styling matches other sidebar items (accent background, font-weight 500).
 
@@ -103,8 +98,7 @@ The screen follows the same visual patterns as the Library screen (spec 06):
 
 ## Out of Scope
 
-- EPUB chapter rendering in the preview area (requires EPUB HTML parsing and sandboxed rendering).
-- Clickable table of contents with chapter navigation (requires EPUB NCX/nav parsing).
+- EPUB content rendering in the preview area (requires EPUB HTML parsing and sandboxed rendering).
 - Drag-and-drop reordering of the EPUB list.
 - EPUB validation (epubcheck integration).
 - Conversion history / reconversion tracking.
