@@ -197,6 +197,9 @@ function importReducer(state, action) {
               fileSize: book.fileSize,
             },
           };
+          if (book.conversionSettings) {
+            fileData.overrides = book.conversionSettings;
+          }
           if (book.status === 'converted' && book.outputPath) {
             fileData.outputPath = book.outputPath;
             fileData.conversionResult = {

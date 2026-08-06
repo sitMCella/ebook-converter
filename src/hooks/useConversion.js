@@ -82,6 +82,7 @@ export function useConversion() {
               outputPath: result.outputPath,
               images: result.images,
               epubFileSize: result.fileSize,
+              conversionSettings: file.overrides || null,
             });
           } catch {
             // metadata persistence is best-effort
