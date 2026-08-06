@@ -14,7 +14,7 @@
     "fs:allow-stat",
     "fs:allow-mkdir",
     "fs:allow-exists",
-    "fs:allow-app-data-read",
-    "fs:allow-app-data-write"
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive"
   ]
 }
