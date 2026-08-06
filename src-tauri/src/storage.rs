@@ -130,6 +130,20 @@ pub fn get_books_dir(app: tauri::AppHandle) -> Result<String, String> {
         .ok_or_else(|| "Invalid books directory path".to_string())
 }
 
+#[tauri::command]
+pub fn get_book_dir(app: tauri::AppHandle, book_id: String) -> Result<String, String> {
+    validate_book_id(&book_id)?;
+    let books_dir = get_books_dir_path(&app)?;
+    let book_dir = books_dir.join(&book_id);
+    if !book_dir.exists() {
+        return Err(format!("Book directory does not exist: {}", book_id));
+    }
+    book_dir
+        .to_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| "Invalid book directory path".to_string())
+}
+
 pub fn write_book_metadata(books_dir: &PathBuf, metadata: &BookMetadata) -> Result<(), String> {
     validate_book_id(&metadata.book_id)?;
     let metadata_path = books_dir.join(&metadata.book_id).join("metadata.json");

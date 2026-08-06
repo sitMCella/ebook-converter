@@ -6,11 +6,13 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../../lib/tauri', async (importOriginal) => ({
   ...(await importOriginal()),
   openFileWithSystem: vi.fn(),
+  openFolder: vi.fn(),
+  getBookDir: vi.fn().mockResolvedValue('/app-data/books/book-uuid-1'),
   isTauri: true,
 }));
 
 import { EpubDetailPanel } from './EpubDetailPanel';
-import { openFileWithSystem } from '../../lib/tauri';
+import { openFileWithSystem, openFolder, getBookDir } from '../../lib/tauri';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -21,6 +23,7 @@ vi.mock('react-router-dom', async () => {
 const baseFile = {
   path: '/docs/design-patterns.pdf',
   name: 'Design patterns.pdf',
+  bookId: 'book-uuid-1',
   outputPath: '/output/Design patterns.epub',
   conversionResult: {
     outputPath: '/output/Design patterns.epub',
@@ -58,5 +61,24 @@ describe('EpubDetailPanel (Tauri mode)', () => {
 
     await user.click(screen.getByText('Open in reader'));
     expect(openFileWithSystem).not.toHaveBeenCalled();
+  });
+
+  it('shows "Open folder" button when file has bookId', () => {
+    renderPanel();
+    expect(screen.getByText('Open folder')).toBeInTheDocument();
+  });
+
+  it('calls openFolder with the book directory on click', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByText('Open folder'));
+    expect(getBookDir).toHaveBeenCalledWith('book-uuid-1');
+    expect(openFolder).toHaveBeenCalledWith('/app-data/books/book-uuid-1');
+  });
+
+  it('does not show "Open folder" when bookId is missing', () => {
+    renderPanel({ ...baseFile, bookId: undefined });
+    expect(screen.queryByText('Open folder')).not.toBeInTheDocument();
   });
 });
