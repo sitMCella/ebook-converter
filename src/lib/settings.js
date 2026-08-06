@@ -38,17 +38,14 @@ export async function loadSettings() {
   if (!isTauri) return { ...DEFAULT_SETTINGS };
 
   try {
-    const { appDataDir } = await import('@tauri-apps/api/path');
-    const { readTextFile, exists } = await import('@tauri-apps/plugin-fs');
+    const { readTextFile, exists, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+    const opts = { baseDir: BaseDirectory.AppData };
 
-    const dir = await appDataDir();
-    const path = `${dir}settings.json`;
-
-    if (!(await exists(path))) {
+    if (!(await exists('settings.json', opts))) {
       return { ...DEFAULT_SETTINGS };
     }
 
-    const text = await readTextFile(path);
+    const text = await readTextFile('settings.json', opts);
     const parsed = JSON.parse(text);
     return mergeSettings(DEFAULT_SETTINGS, parsed);
   } catch {
@@ -60,16 +57,14 @@ export async function saveSettings(settings) {
   if (!isTauri) return;
 
   try {
-    const { appDataDir } = await import('@tauri-apps/api/path');
-    const { writeTextFile, mkdir, exists } = await import('@tauri-apps/plugin-fs');
+    const { writeTextFile, mkdir, exists, BaseDirectory } = await import('@tauri-apps/plugin-fs');
+    const opts = { baseDir: BaseDirectory.AppData };
 
-    const dir = await appDataDir();
-    if (!(await exists(dir))) {
-      await mkdir(dir, { recursive: true });
+    if (!(await exists('', opts))) {
+      await mkdir('', { ...opts, recursive: true });
     }
 
-    const path = `${dir}settings.json`;
-    await writeTextFile(path, JSON.stringify(settings, null, 2));
+    await writeTextFile('settings.json', JSON.stringify(settings, null, 2), opts);
   } catch (e) {
     console.error('Failed to save settings:', e);
   }
