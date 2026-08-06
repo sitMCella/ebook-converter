@@ -32,6 +32,8 @@ pub struct BookMetadata {
     pub images: Option<usize>,
     #[serde(default)]
     pub epub_file_size: Option<u64>,
+    #[serde(default)]
+    pub conversion_settings: Option<serde_json::Value>,
 }
 
 pub fn get_books_dir_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -235,6 +237,7 @@ mod tests {
             output_path: None,
             images: None,
             epub_file_size: None,
+            conversion_settings: None,
         }
     }
 
@@ -313,5 +316,49 @@ mod tests {
 
         let books = read_all_book_metadata(&books_dir).unwrap();
         assert_eq!(books.len(), 3);
+    }
+
+    #[test]
+    fn write_and_read_conversion_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let books_dir = dir.path().to_path_buf();
+        let book_id = Uuid::new_v4().to_string();
+        let book_dir = books_dir.join(&book_id);
+        std::fs::create_dir_all(&book_dir).unwrap();
+
+        let mut metadata = make_test_metadata(&book_id);
+        metadata.conversion_settings = Some(serde_json::json!({
+            "structure": { "headingLevelThreshold": 3 },
+            "images": { "imageQuality": "low" }
+        }));
+        write_book_metadata(&books_dir, &metadata).unwrap();
+
+        let books = read_all_book_metadata(&books_dir).unwrap();
+        assert_eq!(books.len(), 1);
+        let settings = books[0].conversion_settings.as_ref().unwrap();
+        assert_eq!(settings["structure"]["headingLevelThreshold"], 3);
+        assert_eq!(settings["images"]["imageQuality"], "low");
+    }
+
+    #[test]
+    fn read_metadata_without_conversion_settings_defaults_to_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let books_dir = dir.path().to_path_buf();
+        let book_id = Uuid::new_v4().to_string();
+        let book_dir = books_dir.join(&book_id);
+        std::fs::create_dir_all(&book_dir).unwrap();
+
+        let metadata = make_test_metadata(&book_id);
+        write_book_metadata(&books_dir, &metadata).unwrap();
+
+        let metadata_path = book_dir.join("metadata.json");
+        let content = std::fs::read_to_string(&metadata_path).unwrap();
+        let mut json: serde_json::Value = serde_json::from_str(&content).unwrap();
+        json.as_object_mut().unwrap().remove("conversionSettings");
+        std::fs::write(&metadata_path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+
+        let books = read_all_book_metadata(&books_dir).unwrap();
+        assert_eq!(books.len(), 1);
+        assert!(books[0].conversion_settings.is_none());
     }
 }
