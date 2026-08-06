@@ -34,7 +34,11 @@
 
 ### T4: Create Detail Panel
 - [x] Create `src/components/library/DetailPanel.jsx` as the right panel container
-- [x] Create `src/components/library/PagePreview.jsx` with placeholder UI
+- [x] Create `src/components/library/PagePreview.jsx` with cover image extraction
+  - [x] Add `get_pdf_cover` Rust command (reuses `extract_cover_image` from conversion pipeline)
+  - [x] Register `get_pdf_cover` in `lib.rs` invoke handler
+  - [x] Add `getPdfCover()` bridge function in `tauri.js`
+  - [x] Implement async cover loading with loading spinner, image display, and fallback states
 - [x] Create `src/components/library/MetadataSection.jsx` with labelled properties
 - [x] Hide metadata rows when values are absent
 - [x] Create `src/components/library/ConversionOptions.jsx` with collapsible section

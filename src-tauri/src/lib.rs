@@ -23,6 +23,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       pdf::validate_pdf,
       pdf::get_pdf_metadata,
+      pdf::get_pdf_cover,
       conversion::convert_pdf,
       conversion::cancel_conversion,
       storage::import_pdf,

@@ -116,6 +116,14 @@ async function getFileSize(path) {
   return 0;
 }
 
+async function getPdfCover(path) {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('get_pdf_cover', { path });
+  }
+  return { coverImage: null };
+}
+
 async function convertPdfToEpub(path, options) {
   if (isTauri) {
     const { invoke } = await import('@tauri-apps/api/core');
@@ -214,6 +222,7 @@ export {
   openPdfFiles,
   validatePdf,
   getPdfMetadata,
+  getPdfCover,
   getFileSize,
   importPdf,
   deleteBook,

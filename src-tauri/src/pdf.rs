@@ -3,6 +3,8 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
+use crate::conversion::image_extractor::extract_cover_image;
+
 #[derive(Serialize)]
 #[serde(tag = "status")]
 pub enum PdfValidation {
@@ -12,6 +14,12 @@ pub enum PdfValidation {
     Encrypted,
     #[serde(rename = "error")]
     Error { message: String },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PdfCoverData {
+    pub cover_image: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -55,6 +63,19 @@ pub fn validate_pdf(path: String) -> Result<PdfValidation, String> {
             }
         }
     }
+}
+
+#[tauri::command]
+pub fn get_pdf_cover(path: String) -> Result<PdfCoverData, String> {
+    let cover = extract_cover_image(&path, "firstPage")?;
+
+    let cover_image = cover.map(|img| {
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&img.data);
+        format!("data:{};base64,{}", img.mime_type, b64)
+    });
+
+    Ok(PdfCoverData { cover_image })
 }
 
 pub fn get_pdf_metadata_internal(path: &str) -> Result<PdfMetadata, String> {

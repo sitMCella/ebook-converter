@@ -41,9 +41,11 @@ Per-document conversion overrides are added as an `overrides` field on the file 
 
 The selected document path is component-local state in LibraryScreen, initialised from React Router location state (when navigating from the Import list). Search query is also component-local.
 
-### D4: Page Preview — Placeholder
+### D4: Cover Page Preview — Extracted Image
 
-PDF page rendering requires a backend command (`render_pdf_page`) that does not exist yet. The preview section shows a placeholder with the file icon and page count. This is explicitly deferred (spec FR-4).
+The page preview section displays the cover image extracted from the first page of the stored PDF. A new Tauri IPC command `get_pdf_cover` reuses the existing `extract_cover_image` function from the conversion pipeline's `image_extractor` module. It extracts the largest embedded XObject image from page 1, encodes it as a base64 data URI (`data:image/jpeg;base64,...`), and returns it to the frontend.
+
+The `PagePreview` component follows the same async loading pattern as `EpubPreview`: a `useEffect` triggers on the file's `storedPdfPath`, shows a loading spinner while fetching, then displays the image or a "No cover image available" fallback. This approach avoids adding a full PDF page rendering library (like pdfium or mupdf) while providing a useful preview for PDFs that have an embedded cover image on their first page.
 
 ### D5: Conversion Entry Point
 
@@ -77,6 +79,6 @@ The import flow in `useImport.js` calls `importPdf()` and `saveBookMetadata()` d
 |------|-----------|
 | Large file list performance | Document list uses fixed-height items; metadata display is for the selected file only |
 | Settings screen not yet implemented | ConversionOptions reads defaults from `DEFAULT_SETTINGS`; global settings changes will work automatically once the Settings screen is built |
-| Page preview not available | Clear placeholder UI; no broken functionality |
+| PDF has no embedded cover image | Fallback placeholder shown ("No cover image available") — no broken functionality |
 | Metadata file corruption | `read_all_book_metadata()` silently skips dirs with missing or malformed `metadata.json` |
 | Startup load race condition | `LOAD_LIBRARY` does not overwrite files already in the Map, so books imported during the current session before the async load completes are preserved |
