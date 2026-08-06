@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ChevronRight, ChevronDown, X } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
 import { useSettings } from '../../contexts/SettingsContext';
-import { saveBookMetadata } from '../../lib/tauri';
 
 const QUALITY_OPTIONS = [
   { value: 'high', label: 'High' },
@@ -127,41 +126,16 @@ export function ConversionOptions({ file }) {
 
   const overrideCount = countOverrides(overrides);
 
-  function persistOverrides(newOverrides) {
-    dispatch({
-      type: 'SET_DOCUMENT_OVERRIDES',
-      path: file.path,
-      overrides: newOverrides,
-    });
-    if (file.bookId) {
-      saveBookMetadata({
-        bookId: file.bookId,
-        storedPdfPath: file.storedPdfPath,
-        originalPath: file.path,
-        originalName: file.name,
-        fileSize: file.metadata?.fileSize || file.size || 0,
-        title: file.metadata?.title || null,
-        author: file.metadata?.author || null,
-        pageCount: file.metadata?.pageCount || 0,
-        pdfVersion: file.metadata?.pdfVersion || null,
-        createdDate: file.metadata?.createdDate || null,
-        modifiedDate: file.metadata?.modifiedDate || null,
-        producer: file.metadata?.producer || null,
-        status: file.status || 'ready',
-        outputPath: file.outputPath || null,
-        images: file.conversionResult?.images ?? null,
-        epubFileSize: file.conversionResult?.fileSize ?? null,
-        conversionSettings: newOverrides || null,
-      }).catch(() => {});
-    }
-  }
-
   function setOverride(group, key, value) {
     const newOverrides = {
       ...overrides,
       [group]: { ...overrides[group], [key]: value },
     };
-    persistOverrides(newOverrides);
+    dispatch({
+      type: 'SET_DOCUMENT_OVERRIDES',
+      path: file.path,
+      overrides: newOverrides,
+    });
   }
 
   function resetOverride(group, key) {
@@ -173,8 +147,11 @@ export function ConversionOptions({ file }) {
     } else {
       newOverrides[group] = newGroup;
     }
-    const finalOverrides = Object.keys(newOverrides).length > 0 ? newOverrides : undefined;
-    persistOverrides(finalOverrides);
+    dispatch({
+      type: 'SET_DOCUMENT_OVERRIDES',
+      path: file.path,
+      overrides: Object.keys(newOverrides).length > 0 ? newOverrides : undefined,
+    });
   }
 
   return (
