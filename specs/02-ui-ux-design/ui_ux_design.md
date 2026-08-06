@@ -386,7 +386,7 @@ Below the active queue, under a "Completed" muted label:
 | Action | Result |
 |---|---|
 | Conversion completes | Row moves from active section to completed section. Next queued item begins. |
-| All conversions complete | Header changes to "Conversion complete". "Cancel all" button is replaced by "View converted" primary button. |
+| All conversions complete | Header changes to "Conversion complete". "Cancel all" button is hidden. |
 | Click "Cancel all" | Confirmation dialog: "Cancel N remaining conversion(s)? Files already converted are not affected." Active conversion stops, queued items are removed. |
 | Click a row in the active section | No action (conversion is in progress). |
 | Click a completed row | Navigate to Converted screen with that EPUB selected. |

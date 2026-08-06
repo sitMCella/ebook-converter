@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ConversionQueue } from './ConversionQueue';
@@ -9,7 +8,6 @@ import { useConversionContext } from '../../contexts/ConversionContext';
 import { useConversion } from '../../hooks/useConversion';
 
 export function ConvertingScreen() {
-  const navigate = useNavigate();
   const { state } = useConversionContext();
   const { cancelAll } = useConversion();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -30,9 +28,6 @@ export function ConvertingScreen() {
           >
             Cancel all
           </Button>
-        )}
-        {state.isComplete && (
-          <Button onClick={() => navigate('/converted')}>View converted</Button>
         )}
       </div>
 

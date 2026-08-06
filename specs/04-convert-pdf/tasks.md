@@ -206,7 +206,6 @@
   - "Cancel all" secondary button (right-aligned) — visible when active/queued files exist
     - Shows ConfirmDialog: "Cancel N remaining conversion(s)? Files already converted are not affected."
     - On confirm: calls `cancelAll()` from useConversion
-  - "View converted" primary button — visible when `isComplete` is true, navigates to `/converted`
   - ConversionQueue section
   - ConversionLog section
   - CompletedList section
@@ -266,7 +265,7 @@
 - [ ] Queued files display as "Pending" below the active file
 - [ ] The conversion log shows real-time messages from the backend during conversion
 - [ ] On completion, files move to the "Completed" section with a `Converted` badge
-- [ ] When all conversions finish, the header shows "Conversion complete" and a "View converted" button appears
+- [ ] When all conversions finish, the header shows "Conversion complete" and the "Cancel all" button is hidden
 - [ ] "Cancel all" stops the active conversion and clears queued files after confirmation
 - [ ] A conversion error for one file does not stop the remaining queue
 - [ ] Error files show an `Error` badge with an expandable error detail
