@@ -54,6 +54,11 @@ describe('EpubDetailPanel', () => {
     expect(screen.queryByText('Open in reader')).not.toBeInTheDocument();
   });
 
+  it('hides "Open folder" in browser mode', () => {
+    renderPanel();
+    expect(screen.queryByText('Open folder')).not.toBeInTheDocument();
+  });
+
   it('navigates to library with source path on Reconvert click', async () => {
     const user = userEvent.setup();
     renderPanel();

@@ -8,14 +8,14 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
   listBooks: vi.fn().mockResolvedValue([]),
   openFileWithSystem: vi.fn(),
   openFolder: vi.fn(),
-  getBooksDir: vi.fn().mockResolvedValue('/app-data/books'),
+  getBookDir: vi.fn().mockResolvedValue('/app-data/books/abc-123'),
   isTauri: true,
 }));
 
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionProvider } from '../../contexts/ConversionContext';
 import { ConvertedScreen } from './ConvertedScreen';
-import { openFolder, getBooksDir } from '../../lib/tauri';
+import { openFolder, getBookDir } from '../../lib/tauri';
 import { useEffect } from 'react';
 
 const mockNavigate = vi.fn();
@@ -30,6 +30,7 @@ const convertedFiles = [
     name: 'Design patterns.pdf',
     size: 13003776,
     status: 'converted',
+    bookId: 'abc-123',
     outputPath: '/app-data/books/abc-123/Design patterns.epub',
     conversionResult: {
       outputPath: '/app-data/books/abc-123/Design patterns.epub',
@@ -71,22 +72,22 @@ function renderConverted({ files = convertedFiles } = {}) {
 describe('ConvertedScreen (Tauri mode)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows "Open folder" button when isTauri is true', () => {
+  it('shows "Open folder" button in the detail panel', () => {
     renderConverted();
     expect(screen.getByText('Open folder')).toBeInTheDocument();
   });
 
-  it('calls openFolder with the books directory on click', async () => {
+  it('calls openFolder with the book directory on click', async () => {
     const user = userEvent.setup();
     renderConverted();
 
     await user.click(screen.getByText('Open folder'));
-    expect(getBooksDir).toHaveBeenCalled();
-    expect(openFolder).toHaveBeenCalledWith('/app-data/books');
+    expect(getBookDir).toHaveBeenCalledWith('abc-123');
+    expect(openFolder).toHaveBeenCalledWith('/app-data/books/abc-123');
   });
 
-  it('does not call openFolder when getBooksDir returns empty string', async () => {
-    getBooksDir.mockResolvedValueOnce('');
+  it('does not call openFolder when getBookDir returns empty string', async () => {
+    getBookDir.mockResolvedValueOnce('');
     const user = userEvent.setup();
     renderConverted();
 

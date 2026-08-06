@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Search, FolderOpen, Upload } from 'lucide-react';
+import { Search, Upload } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
-import { openFolder, getBooksDir, isTauri } from '../../lib/tauri';
 import { EpubList } from './EpubList';
 import { EpubDetailPanel } from './EpubDetailPanel';
 import { Button } from '../ui/Button';
@@ -46,13 +45,6 @@ export function ConvertedScreen() {
     }
   }, [selectedFile, filteredFiles]);
 
-  const handleOpenFolder = async () => {
-    const booksDir = await getBooksDir();
-    if (booksDir) {
-      await openFolder(booksDir);
-    }
-  };
-
   if (convertedFiles.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -70,12 +62,6 @@ export function ConvertedScreen() {
       <div className="flex items-center justify-between mb-5">
         <h3 className="text-[18px] font-medium">Converted EPUBs</h3>
         <div className="flex items-center gap-3">
-          {isTauri && (
-            <Button variant="secondary" onClick={handleOpenFolder}>
-              <FolderOpen size={16} />
-              Open folder
-            </Button>
-          )}
           <div className="relative">
             <Search
               size={14}
