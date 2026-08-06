@@ -68,7 +68,7 @@ When a file finishes converting:
 
 When all conversions complete:
 - The header changes to "Conversion complete".
-- The "Cancel all" button is replaced by a "View converted" primary button that navigates to `/converted`.
+- The "Cancel all" button is hidden (no active work remains).
 
 ### FR-8: Error Handling
 
