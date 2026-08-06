@@ -212,12 +212,11 @@ test.describe('Library Screen — Conversion Options', () => {
 
   test('conversion options section is collapsed by default', async ({ page }) => {
     await expect(page.getByText('Conversion options')).toBeVisible();
-    await expect(page.getByText('Split chapters by')).not.toBeVisible();
+    await expect(page.getByText('Heading level threshold')).not.toBeVisible();
   });
 
   test('clicking header expands conversion options', async ({ page }) => {
     await page.getByText('Conversion options').click();
-    await expect(page.getByText('Split chapters by')).toBeVisible();
     await expect(page.getByText('Heading level threshold')).toBeVisible();
     await expect(page.getByText('Base font size')).toBeVisible();
     await expect(page.getByText('Image quality')).toBeVisible();
@@ -226,16 +225,16 @@ test.describe('Library Screen — Conversion Options', () => {
 
   test('clicking header again collapses conversion options', async ({ page }) => {
     await page.getByText('Conversion options').click();
-    await expect(page.getByText('Split chapters by')).toBeVisible();
+    await expect(page.getByText('Heading level threshold')).toBeVisible();
 
     await page.getByText('Conversion options').click();
-    await expect(page.getByText('Split chapters by')).not.toBeVisible();
+    await expect(page.getByText('Heading level threshold')).not.toBeVisible();
   });
 
   test('changing an option shows override count badge', async ({ page }) => {
     await page.getByText('Conversion options').click();
 
-    const qualitySelect = page.locator('select').nth(1);
+    const qualitySelect = page.locator('select').first();
     await qualitySelect.selectOption('low');
 
     await expect(page.getByText('1 custom')).toBeVisible();
@@ -244,7 +243,7 @@ test.describe('Library Screen — Conversion Options', () => {
   test('reset button clears override and removes count badge', async ({ page }) => {
     await page.getByText('Conversion options').click();
 
-    const qualitySelect = page.locator('select').nth(1);
+    const qualitySelect = page.locator('select').first();
     await qualitySelect.selectOption('low');
     await expect(page.getByText('1 custom')).toBeVisible();
 

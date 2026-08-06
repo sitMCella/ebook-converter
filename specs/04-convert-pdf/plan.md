@@ -48,7 +48,7 @@ Use the `pdf-extract` crate for extracting text from PDF pages. It is pure Rust 
 
 ### D2: epub-builder for EPUB Generation
 
-Use the `epub-builder` crate for generating EPUB files. It handles the complex EPUB container format (META-INF, OPF, NCX/nav, XHTML chapters) and supports both EPUB 2 and EPUB 3. The builder pattern API maps cleanly to the conversion pipeline's output.
+Use the `epub-builder` crate for generating EPUB files. It handles the complex EPUB container format (META-INF, OPF, NCX/nav, XHTML content) and supports both EPUB 2 and EPUB 3. The builder pattern API maps cleanly to the conversion pipeline's output.
 
 ### D3: lopdf for Image Extraction
 
@@ -109,7 +109,6 @@ src-tauri/src/
     ├── text_extractor.rs             # PDF text extraction (pdf-extract)
     ├── structure_detector.rs         # Heading, paragraph, list detection
     ├── image_extractor.rs            # Image extraction from PDF (lopdf + image)
-    ├── chapter_splitter.rs           # Chapter splitting strategies
     ├── epub_generator.rs             # EPUB assembly (epub-builder)
     └── css.rs                        # EPUB stylesheet generation
 ```
@@ -152,14 +151,14 @@ const effectiveSettings = deepMerge(globalSettings, documentOverrides);
 ┌─────────────┐     ┌──────────────────┐     ┌──────────────────┐
 │ 1. Extract   │────▸│ 2. Detect        │────▸│ 3. Extract       │
 │    Text      │     │    Structure     │     │    Images        │
-│    (0-40%)   │     │    (40-50%)      │     │    (50-70%)      │
+│    (0-40%)   │     │    (40-55%)      │     │    (55-75%)      │
 └─────────────┘     └──────────────────┘     └──────────────────┘
                                                       │
-┌─────────────┐     ┌──────────────────┐     ┌───────▾──────────┐
-│ 6. Write     │◂───│ 5. Generate      │◂───│ 4. Split         │
-│    File      │     │    EPUB         │     │    Chapters      │
-│    (95-100%) │     │    (80-95%)      │     │    (70-80%)      │
-└─────────────┘     └──────────────────┘     └──────────────────┘
+                    ┌──────────────────┐     ┌───────▾──────────┐
+                    │ 5. Write         │◂───│ 4. Generate      │
+                    │    File          │     │    EPUB          │
+                    │    (95-100%)     │     │    (75-95%)      │
+                    └──────────────────┘     └──────────────────┘
 ```
 
 Each stage checks the cancellation token before proceeding. If cancelled, partial output is cleaned up and an error is returned.

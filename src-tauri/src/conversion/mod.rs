@@ -1,7 +1,6 @@
 pub mod text_extractor;
 pub mod structure_detector;
 pub mod image_extractor;
-pub mod chapter_splitter;
 pub mod epub_generator;
 pub mod css;
 pub mod pipeline;
@@ -28,7 +27,6 @@ pub struct ConversionOptions {
 #[allow(dead_code)]
 pub struct StructureOptions {
     pub detect_headings: bool,
-    pub detect_toc: bool,
     pub detect_footnotes: bool,
     pub heading_level_threshold: u8,
     pub paragraph_detection: bool,
@@ -66,27 +64,17 @@ pub struct PageHandlingOptions {
     pub page_range: String,
     pub page_range_from: Option<u32>,
     pub page_range_to: Option<u32>,
-    pub split_chapters_by: String,
     pub keep_page_breaks: bool,
     pub remove_page_numbers: bool,
     pub cover_page: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct TocEntry {
-    pub title: String,
-    pub level: u8,
 }
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversionResult {
     pub output_path: String,
-    pub chapters: usize,
     pub images: usize,
     pub file_size: u64,
-    pub toc: Vec<TocEntry>,
     pub has_cover: bool,
 }
 

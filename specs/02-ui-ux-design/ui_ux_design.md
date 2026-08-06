@@ -330,7 +330,6 @@ This section implements the per-document override model described below in the "
 │  │  ─────────────────────────────────────────────── ││
 │  │  Extracting text from pages 1–248...             ││
 │  │  Detecting headings and structure...             ││
-│  │  Rebuilding table of contents...                 ││
 │  │  Extracting images (23 of 47)...                 ││
 │  └──────────────────────────────────────────────────┘│
 │                                                      │
@@ -371,7 +370,6 @@ Below the queue, a bordered panel shows real-time log output from the conversion
 - Log entries include:
   - `Extracting text from pages N–M...`
   - `Detecting headings and structure...`
-  - `Rebuilding table of contents...`
   - `Extracting images (X of Y)...`
   - `Generating EPUB structure...`
   - `Writing EPUB file...`
@@ -421,21 +419,18 @@ Mirrors the Library screen (screen 2) layout for consistency, but shows EPUB-spe
 │  │    Pragmatic progr.   │  │   EPUB Preview     │  ││
 │  │                       │  │                    │  ││
 │  │                       │  │   ┌──────────┐     │  ││
-│  │                       │  │   │ chapter  │     │  ││
-│  │                       │  │   │ render   │     │  ││
+│  │                       │  │   │  cover   │     │  ││
+│  │                       │  │   │  image   │     │  ││
 │  │                       │  │   └──────────┘     │  ││
-│  │                       │  │  ◀ Ch. 1/23 ▶      │  ││
+│  │                       │  │                    │  ││
 │  │                       │  └────────────────────┘  ││
 │  │                       │                          ││
 │  │                       │  Metadata                ││
 │  │                       │  ─────────────────────── ││
 │  │                       │  Source: Design pat…pdf  ││
 │  │                       │  EPUB size: 3.1 MB       ││
-│  │                       │  Chapters: 23            ││
 │  │                       │  Images: 47 extracted    ││
 │  │                       │  Converted: 2026-08-02   ││
-│  │                       │                          ││
-│  │                       │  ▸ Table of contents      ││
 │  │                       │                          ││
 │  │                       │  [Open in reader]        ││
 │  │                       │  [Reconvert]             ││
@@ -460,12 +455,8 @@ Mirrors the Library screen (screen 2) layout for consistency, but shows EPUB-spe
 
 #### Section A — EPUB Preview
 
-- Renders the EPUB content chapter by chapter.
-- Navigation controls below the preview:
-  - Left arrow button (previous chapter).
-  - Chapter indicator: "Chapter N of M" (muted text, 12 px).
-  - Right arrow button (next chapter).
-- The preview renders the EPUB HTML content in a sandboxed container, applying the same font and size settings used during conversion, giving the user a representative preview of the reading experience.
+- Displays the EPUB cover image extracted during conversion.
+- If no cover image is available, shows a "No cover image available" placeholder with a muted icon.
 
 #### Section B — Metadata
 
@@ -473,18 +464,10 @@ Mirrors the Library screen (screen 2) layout for consistency, but shows EPUB-spe
 |---|---|---|
 | Source | Original PDF file name | Design patterns.pdf |
 | EPUB size | File system | 3.1 MB |
-| Chapters | EPUB spine count | 23 |
 | Images | Count of extracted images | 47 extracted |
 | Converted | Timestamp of conversion | 2026-08-02 14:32 |
 | EPUB version | From conversion settings | EPUB 3 |
 | Settings used | "Default" or "2 overrides" | Default |
-
-#### Section C — Table of Contents
-
-- Collapsed by default: `▸ Table of contents`.
-- When expanded, shows the EPUB's generated TOC as an indented, clickable list.
-- Clicking a TOC entry navigates the preview to that chapter.
-- Nested entries are indented by 16 px per level.
 
 #### Action Buttons
 
@@ -498,8 +481,6 @@ Stacked vertically, full width:
 | Action | Result |
 |---|---|
 | Click EPUB in list | Selects it; detail panel updates. |
-| Click chapter navigation arrows | Preview updates to the next/previous chapter. |
-| Click TOC entry | Preview jumps to that chapter. |
 | Click "Open in reader" | OS launches the default EPUB reader with this file. |
 | Click "Reconvert" | Navigate to Library screen; source PDF selected; conversion options expanded. |
 
@@ -524,11 +505,11 @@ Stacked vertically, full width:
 │  │  Structure detection   │  Output format          ││
 │  │  ───────────────────── │  ──────────────────     ││
 │  │  Detect headings  [ON] │  EPUB version  [v3]    ││
-│  │  Detect TOC       [ON] │  Embed fonts   [OFF]   ││
-│  │  Detect footnotes[OFF] │  Font family [Default] ││
-│  │  Heading thresh.  [3]  │  Base font size [12pt] ││
-│  │  Paragraph det.   [ON] │  Line height   [1.5]   ││
-│  │  List detection   [ON] │  Margins (em)  [1.0]   ││
+│  │  Detect footnotes[OFF] │  Embed fonts   [OFF]   ││
+│  │  Heading thresh.  [3]  │  Font family [Default] ││
+│  │  Paragraph det.   [ON] │  Base font size [12pt] ││
+│  │  List detection   [ON] │  Line height   [1.5]   ││
+│  │                        │  Margins (em)  [1.0]   ││
 │  │                        │                         ││
 │  │  Images                │  Output location        ││
 │  │  ───────────────────── │  ──────────────────     ││
@@ -540,8 +521,6 @@ Stacked vertically, full width:
 │  │                        │  ──────────────────     ││
 │  │                        │  Skip blank pages [ON]  ││
 │  │                        │  Page range     [All]   ││
-│  │                        │  Split chapters by      ││
-│  │                        │    [Heading level 1]    ││
 │  └────────────────────────┴─────────────────────────┘│
 └──────────────────────────────────────────────────────┘
 ```
@@ -569,7 +548,6 @@ Each setting row has:
 | Setting | Control | Default | Description |
 |---|---|---|---|
 | Detect headings | Toggle | ON | Identify heading hierarchy from font size and weight patterns in the PDF. |
-| Detect table of contents | Toggle | ON | Find and parse the PDF's table of contents page(s) to generate EPUB navigation. |
 | Detect footnotes | Toggle | OFF | Identify footnotes and convert them to EPUB footnote markup. |
 | Heading level threshold | Number (1–6) | 3 | Maximum heading depth to detect. Level 1 = largest headings only; level 6 = all sizes. |
 | Paragraph detection | Toggle | ON | Merge text runs into semantic paragraphs based on spacing analysis. |
@@ -607,7 +585,6 @@ Each setting row has:
 |---|---|---|---|
 | Skip blank pages | Toggle | ON | Omit pages that contain no text or images from the EPUB output. |
 | Page range | Dropdown: All / Custom | All | Convert all pages or a custom range. When "Custom" is selected, two number inputs appear: "From" and "To". |
-| Split chapters by | Dropdown: Heading level 1 / Heading level 2 / Page break / None | Heading level 1 | How the converter decides where one EPUB chapter ends and the next begins. |
 
 ### Setting Persistence
 
@@ -636,7 +613,6 @@ Each setting row has:
 GlobalSettings {
   structure: {
     detectHeadings: boolean
-    detectToc: boolean
     detectFootnotes: boolean
     headingLevelThreshold: number
     paragraphDetection: boolean
@@ -661,7 +637,6 @@ GlobalSettings {
     pageRange: "all" | "custom"
     pageRangeFrom: number | null
     pageRangeTo: number | null
-    splitChaptersBy: "heading1" | "heading2" | "pageBreak" | "none"
   }
   outputLocation: {
     defaultFolder: string
@@ -698,7 +673,6 @@ All settings except `outputLocation.defaultFolder` can be overridden per documen
 
 | Setting | Control | Inherited display |
 |---|---|---|
-| Split chapters by | Dropdown | "Heading level 1 (default)" |
 | Heading level threshold | Number | "3 (default)" |
 | Base font size | Number | "12 pt (default)" |
 | Image quality | Dropdown | "Medium (default)" |
@@ -756,7 +730,7 @@ Toasts stack vertically (newest on top, max 3 visible). Each toast has a manual 
 |---|---|---|
 | `Tab` / `Shift+Tab` | Global | Move focus between interactive elements in reading order. |
 | `Enter` / `Space` | Button focused | Activate the button. |
-| `Arrow Left` / `Arrow Right` | Page preview focused | Navigate pages (Library) or chapters (Converted). |
+| `Arrow Left` / `Arrow Right` | Page preview focused | Navigate pages (Library). |
 | `Escape` | Dialog open | Close the dialog. |
 | `Cmd/Ctrl + O` | Global | Open the file picker (same as "Browse files"). |
 | `Cmd/Ctrl + ,` | Global | Navigate to Settings. |

@@ -30,8 +30,6 @@ export function EpubPreview({ file }) {
     return () => { cancelled = true; };
   }, [outputPath]);
 
-  const chapters = file.conversionResult?.chapters ?? 0;
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-10 rounded-[12px] bg-[var(--surface-2)] border border-[var(--border)]">
@@ -59,11 +57,6 @@ export function EpubPreview({ file }) {
       <p className="text-[13px] text-[var(--text-muted)]">
         {error || 'No cover image available'}
       </p>
-      {chapters > 0 && (
-        <p className="text-[12px] text-[var(--text-muted)] mt-1">
-          {chapters} {chapters === 1 ? 'chapter' : 'chapters'}
-        </p>
-      )}
     </div>
   );
 }

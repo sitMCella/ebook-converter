@@ -1,4 +1,3 @@
-use super::chapter_splitter;
 use super::epub_generator;
 use super::image_extractor;
 use super::structure_detector;
@@ -110,22 +109,6 @@ pub async fn run_conversion(
         return Err("Conversion cancelled".to_string());
     }
 
-    emit_progress(app, &path_owned, "splitting_chapters", 70, "Splitting into chapters...");
-
-    let chapters = chapter_splitter::split_chapters(content, &options.page_handling);
-
-    emit_progress(
-        app,
-        &path_owned,
-        "splitting_chapters",
-        80,
-        &format!("Split into {} chapters", chapters.len()),
-    );
-
-    if cancel_token.load(Ordering::Relaxed) {
-        return Err("Conversion cancelled".to_string());
-    }
-
     emit_progress(app, &path_owned, "assembling_epub", 80, "Generating EPUB structure...");
 
     let output_path = if let Some(ref book_id) = options.book_id {
@@ -146,12 +129,7 @@ pub async fn run_conversion(
 
     emit_progress(app, &path_owned, "assembling_epub", 90, "Writing EPUB file...");
 
-    let mut result = epub_generator::generate_epub(&chapters, &images, cover_image.as_ref(), &metadata, options, &output_path)?;
-
-    let pdf_outline = pdf::extract_outline(path);
-    if !pdf_outline.is_empty() {
-        result.toc = pdf_outline;
-    }
+    let result = epub_generator::generate_epub(&content, &images, cover_image.as_ref(), &metadata, options, &output_path)?;
 
     emit_progress(app, &path_owned, "complete", 100, "Conversion complete.");
 

@@ -15,7 +15,6 @@ The Converted screen consumes `ImportContext` state, filtering for files with st
 │  │  EpubList (260px)     │  EpubDetailPanel (flex-1)││
 │  │    EpubListItem       │    EpubPreview           ││
 │  │    EpubListItem       │    EpubMetadata          ││
-│  │                       │    TableOfContents       ││
 │  │                       │    [Action buttons]      ││
 │  └───────────────────────┴──────────────────────────┘│
 │                                                      │
@@ -29,21 +28,17 @@ The Converted screen consumes `ImportContext` state, filtering for files with st
 
 The Converted screen reads from the same `ImportContext` that Import and Library use. Converted files are identified by `status === 'converted'` and have `outputPath` and `conversionResult` fields. No separate "converted state" is needed.
 
-Conversion results are persisted to disk: after a successful conversion, `useConversion` calls `saveBookMetadata` to write the `'converted'` status along with `outputPath`, `chapters`, `images`, and `epubFileSize` to the book's `metadata.json`. On startup, the `LOAD_LIBRARY` reducer restores these fields from the loaded `BookMetadata`, ensuring converted files appear after restart. The Rust `BookMetadata` struct uses `#[serde(default)]` on the new optional fields for backward compatibility with older metadata files.
+Conversion results are persisted to disk: after a successful conversion, `useConversion` calls `saveBookMetadata` to write the `'converted'` status along with `outputPath`, `images`, and `epubFileSize` to the book's `metadata.json`. On startup, the `LOAD_LIBRARY` reducer restores these fields from the loaded `BookMetadata`, ensuring converted files appear after restart. The Rust `BookMetadata` struct uses `#[serde(default)]` on the new optional fields for backward compatibility with older metadata files.
 
 ### D2: Selection — Component State
 
 The selected EPUB path is component-local state in ConvertedScreen, initialised from React Router location state (when navigating from the Converting screen). Search query is also component-local. This mirrors the Library screen's approach.
 
-### D3: EPUB Preview — Placeholder
+### D3: EPUB Preview — Cover Image
 
-EPUB chapter rendering requires parsing EPUB XHTML content and rendering it in a sandboxed iframe/container. This is complex and deferred. The preview section shows a placeholder with a Book icon and chapter count. This parallels the Library's deferred page preview.
+The preview section shows the EPUB cover image when available, extracted via the `readEpubPreview` bridge function. When no cover image is available, a placeholder with a Book icon is shown. Full EPUB content rendering is deferred.
 
-### D4: Table of Contents — Placeholder
-
-Parsing the EPUB's NCX or nav document to build a clickable TOC requires either a Rust command to extract the TOC structure or frontend EPUB parsing. Deferred. The collapsible section shows a placeholder message when expanded.
-
-### D5: Tauri Bridge — Open File and Open Folder
+### D4: Tauri Bridge — Open File and Open Folder
 
 Two new bridge functions are added to `src/lib/tauri.js`:
 - `openFileWithSystem(path)` — uses the Tauri shell plugin's `open()` to launch the file with the OS default app.
@@ -51,11 +46,11 @@ Two new bridge functions are added to `src/lib/tauri.js`:
 
 Both fall back to no-ops in browser mode (with the exception of "Open in reader" which triggers a download in browser mode).
 
-### D6: Component Structure
+### D5: Component Structure
 
 Components are co-located in `src/components/converted/`. The screen follows the same page-level pattern as LibraryScreen: header row with title + actions, then content below.
 
-### D7: File Name Derivation
+### D6: File Name Derivation
 
 The EPUB file on disk is named after the source PDF by the Rust backend: `storage::get_epub_output_path` extracts the PDF file stem and produces `books/<uuid>/<stem>.epub` (e.g., `Design patterns.pdf` → `Design patterns.epub`). On the frontend, EPUB file names are derived from the `outputPath` on the file object (extracting the basename). If `outputPath` is not available, the source PDF name is used with `.epub` appended.
 
@@ -87,8 +82,7 @@ The Converted metadata section shows "Default" or "N overrides" for the "Setting
 |------|-----------|
 | No converted files to show during development | Use the existing conversion pipeline to produce test files; unit tests seed converted file entries via dispatch |
 | Shell plugin unavailable | Shell plugin is installed (`@tauri-apps/plugin-shell` npm, `tauri-plugin-shell` Cargo, registered in `lib.rs`, `shell:allow-open` capability granted); in browser mode, functions are no-ops |
-| EPUB preview complexity | Clear placeholder UI with book icon and chapter count; no broken functionality |
-| TOC parsing complexity | Collapsible section with placeholder message; expandable in a future spec |
+| EPUB preview complexity | Cover image display when available; placeholder UI with book icon otherwise |
 | Conversion result data missing | Handle null/undefined `conversionResult` gracefully; show available fields only |
 | Converted files lost on restart | Conversion results persisted to `metadata.json` via `saveBookMetadata`; `LOAD_LIBRARY` restores `outputPath` and `conversionResult` for books with `status === 'converted'` |
 | Old metadata.json without conversion fields | `BookMetadata` uses `#[serde(default)]` on new optional fields; old files deserialize safely with `None` values |

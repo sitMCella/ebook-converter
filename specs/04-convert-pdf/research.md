@@ -28,7 +28,7 @@
 
 ### Recommendation: pdf-extract for v1, pdfium-render for Future
 
-**For this spec (v1 conversion)**: use `pdf-extract`. It is pure Rust, extracts text content from PDF pages, and has no external shared library dependency. Its output is plain text per page — sufficient for producing readable EPUB chapters. It does not provide character-level position or font metadata, which limits structural detection (headings, lists). For v1, heading detection will use heuristics on the extracted text (blank-line separation, short uppercase lines, etc.).
+**For this spec (v1 conversion)**: use `pdf-extract`. It is pure Rust, extracts text content from PDF pages, and has no external shared library dependency. Its output is plain text per page — sufficient for producing readable EPUB content. It does not provide character-level position or font metadata, which limits structural detection (headings, lists). For v1, heading detection will use heuristics on the extracted text (blank-line separation, short uppercase lines, etc.).
 
 **Limitations of pdf-extract**:
 - No font size/weight information → heading detection is heuristic-only.
@@ -110,10 +110,10 @@ builder.epub_version(EpubVersion::V30);
 // Add CSS stylesheet
 builder.stylesheet(css_content.as_bytes())?;
 
-// Add a chapter
+// Add content
 builder.add_content(
-    EpubContent::new("chapter1.xhtml", chapter_html.as_bytes())
-        .title("Chapter 1: Introduction")
+    EpubContent::new("content.xhtml", content_html.as_bytes())
+        .title("Content")
         .reftype(ReferenceType::Text),
 )?;
 
@@ -135,11 +135,10 @@ output.epub (ZIP archive)
 │   └── container.xml                 # Points to content.opf
 ├── OEBPS/
 │   ├── content.opf                   # Package document (metadata, manifest, spine)
-│   ├── toc.ncx                       # NCX table of contents (EPUB 2)
+│   ├── toc.ncx                       # NCX navigation (EPUB 2)
 │   ├── nav.xhtml                     # XHTML navigation (EPUB 3)
 │   ├── stylesheet.css                # Embedded CSS
-│   ├── chapter1.xhtml                # Chapter content
-│   ├── chapter2.xhtml
+│   ├── content.xhtml                 # All structured content in a single file
 │   └── images/
 │       ├── fig1.png
 │       └── fig2.jpg
@@ -206,7 +205,7 @@ async fn convert_pdf(
 
     // ... do work ...
 
-    Ok(ConversionResult { output_path, chapters, images })
+    Ok(ConversionResult { output_path, images })
 }
 ```
 

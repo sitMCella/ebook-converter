@@ -80,10 +80,8 @@ export function useConversion() {
               producer: file.metadata?.producer || null,
               status: 'converted',
               outputPath: result.outputPath,
-              chapters: result.chapters,
               images: result.images,
               epubFileSize: result.fileSize,
-              toc: result.toc || [],
             });
           } catch {
             // metadata persistence is best-effort

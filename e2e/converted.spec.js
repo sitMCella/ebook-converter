@@ -52,13 +52,7 @@ function mockSuccessfulConversion(page) {
       `return Promise.resolve({
         outputPath: '/fake/output/' + path.replace(/\\.pdf$/i, '.epub'),
         fileSize: 1048576,
-        chapters: 12,
         images: 5,
-        toc: [
-          { title: 'Introduction', level: 1 },
-          { title: 'Chapter 1', level: 1 },
-          { title: 'Chapter 2', level: 1 },
-        ],
       })`,
     );
     await route.fulfill({ body: modified, headers: response.headers() });
@@ -158,7 +152,7 @@ test.describe('Converted Screen — EPUB Selection', () => {
 
   test('selected EPUB shows its details in the detail panel', async ({ page }) => {
     await page.getByRole('option').filter({ hasText: 'doc-two.epub' }).click();
-    await expect(page.getByText('EPUB preview not yet available')).toBeVisible();
+    await expect(page.getByText('No cover image available')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
   });
 });
@@ -223,12 +217,9 @@ test.describe('Converted Screen — Preview', () => {
   });
 
   test('shows EPUB preview placeholder', async ({ page }) => {
-    await expect(page.getByText('EPUB preview not yet available')).toBeVisible();
+    await expect(page.getByText('No cover image available')).toBeVisible();
   });
 
-  test('shows chapter count in preview area', async ({ page }) => {
-    await expect(page.getByText('12 chapters')).toBeVisible();
-  });
 });
 
 // --- Detail Panel — Metadata ---
@@ -253,10 +244,6 @@ test.describe('Converted Screen — Metadata', () => {
     await expect(metadataSection.getByText('1.0 MB')).toBeVisible();
   });
 
-  test('shows chapter count in metadata', async ({ page }) => {
-    await expect(page.getByText('Chapters', { exact: true })).toBeVisible();
-  });
-
   test('shows extracted image count', async ({ page }) => {
     await expect(page.getByText('Images')).toBeVisible();
     await expect(page.getByText('5 extracted')).toBeVisible();
@@ -265,35 +252,6 @@ test.describe('Converted Screen — Metadata', () => {
   test('shows settings used label', async ({ page }) => {
     await expect(page.getByText('Settings used')).toBeVisible();
     await expect(page.getByText('Default')).toBeVisible();
-  });
-});
-
-// --- Detail Panel — Table of Contents ---
-
-test.describe('Converted Screen — Table of Contents', () => {
-  test.beforeEach(async ({ page }) => {
-    await importConvertAndNavigate(page, 'toc-test.pdf');
-  });
-
-  test('shows Table of contents section collapsed with entry count', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Table of contents' })).toBeVisible();
-    await expect(page.getByText('(3)')).toBeVisible();
-    await expect(page.getByText('Introduction')).not.toBeVisible();
-  });
-
-  test('clicking expands Table of contents with chapter entries', async ({ page }) => {
-    await page.getByRole('button', { name: 'Table of contents' }).click();
-    await expect(page.getByText('Introduction')).toBeVisible();
-    await expect(page.getByText('Chapter 1')).toBeVisible();
-    await expect(page.getByText('Chapter 2')).toBeVisible();
-  });
-
-  test('clicking again collapses Table of contents', async ({ page }) => {
-    await page.getByRole('button', { name: 'Table of contents' }).click();
-    await expect(page.getByText('Introduction')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Table of contents' }).click();
-    await expect(page.getByText('Introduction')).not.toBeVisible();
   });
 });
 

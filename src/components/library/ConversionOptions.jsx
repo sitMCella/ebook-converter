@@ -3,13 +3,6 @@ import { ChevronRight, ChevronDown, X } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
 import { useSettings } from '../../contexts/SettingsContext';
 
-const SPLIT_OPTIONS = [
-  { value: 'heading1', label: 'Heading level 1' },
-  { value: 'heading2', label: 'Heading level 2' },
-  { value: 'pageBreak', label: 'Page break' },
-  { value: 'none', label: 'None' },
-];
-
 const QUALITY_OPTIONS = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
@@ -179,16 +172,6 @@ export function ConversionOptions({ file }) {
 
       {expanded && (
         <div className="pl-6 pb-2 flex flex-col gap-1">
-          <OverrideRow label="Split chapters by">
-            <SelectControl
-              value={overrides.pageHandling?.splitChaptersBy}
-              defaultValue={globalSettings.pageHandling.splitChaptersBy}
-              options={SPLIT_OPTIONS}
-              onChange={(v) => setOverride('pageHandling', 'splitChaptersBy', v)}
-              onReset={() => resetOverride('pageHandling', 'splitChaptersBy')}
-            />
-          </OverrideRow>
-
           <OverrideRow label="Heading level threshold">
             <NumberControl
               value={overrides.structure?.headingLevelThreshold}

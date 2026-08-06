@@ -243,7 +243,6 @@ mod tests {
     fn default_options() -> StructureOptions {
         StructureOptions {
             detect_headings: true,
-            detect_toc: true,
             detect_footnotes: false,
             heading_level_threshold: 3,
             paragraph_detection: true,

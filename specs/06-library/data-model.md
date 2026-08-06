@@ -57,7 +57,6 @@ A partial subset of the global settings (excluding `outputLocation`):
     baseFontSize?: number,
   },
   pageHandling?: {
-    splitChaptersBy?: 'heading1' | 'heading2' | 'pageBreak' | 'none',
     pageRange?: 'all' | 'custom',
     pageRangeFrom?: number | null,
     pageRangeTo?: number | null,

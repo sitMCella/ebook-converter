@@ -24,7 +24,6 @@ const baseFile = {
   outputPath: '/output/Design patterns.epub',
   conversionResult: {
     outputPath: '/output/Design patterns.epub',
-    chapters: 23,
     images: 47,
     fileSize: 3250585,
   },
@@ -39,11 +38,10 @@ function renderPanel(file = baseFile) {
 }
 
 describe('EpubDetailPanel', () => {
-  it('renders preview, metadata, and table of contents sections', () => {
+  it('renders preview and metadata sections', () => {
     renderPanel();
     expect(screen.getByText('No cover image available')).toBeInTheDocument();
     expect(screen.getByText('Metadata')).toBeInTheDocument();
-    expect(screen.getByText('Table of contents')).toBeInTheDocument();
   });
 
   it('renders Reconvert button in browser mode', () => {
