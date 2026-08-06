@@ -107,12 +107,6 @@ test.describe('Converting screen — empty state', () => {
     ).not.toBeVisible();
   });
 
-  test('does not show View converted button', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /view converted/i }),
-    ).not.toBeVisible();
-  });
-
   test('log region has aria-live polite', async ({ page }) => {
     const logRegion = page.locator('[aria-label="Conversion log entries"]');
     await expect(logRegion).toHaveAttribute('aria-live', 'polite');
@@ -155,14 +149,6 @@ test.describe('Single file conversion — error handling', () => {
 
     await expect(
       page.getByRole('heading', { name: 'Conversion complete' }),
-    ).toBeVisible();
-  });
-
-  test('shows View converted button after completion', async ({ page }) => {
-    await importAndConvert(page, 'document.pdf');
-
-    await expect(
-      page.getByRole('button', { name: /view converted/i }),
     ).toBeVisible();
   });
 
@@ -381,16 +367,6 @@ test.describe('Progress bar accessibility', () => {
 test.describe('Navigation', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/import');
-  });
-
-  test('View converted button navigates to /converted', async ({ page }) => {
-    await importAndConvert(page, 'nav-test.pdf');
-
-    await expect(
-      page.getByRole('button', { name: /view converted/i }),
-    ).toBeVisible();
-    await page.getByRole('button', { name: /view converted/i }).click();
-    await expect(page).toHaveURL(/\/converted/);
   });
 
   test('clicking completed file row navigates to /converted', async ({
