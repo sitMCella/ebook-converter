@@ -39,9 +39,16 @@ When a document is selected, the right panel shows a labelled list of document p
 
 If a metadata field is absent, the row is hidden (not shown as "Unknown").
 
-### FR-4: Detail Panel — Page Preview (Deferred)
+### FR-4: Detail Panel — Cover Page Preview
 
-A rendered preview of the selected PDF page. This requires a backend command to render PDF pages as images, which is not yet implemented. The UI shows a placeholder indicating preview is not yet available.
+The page preview section displays the cover image extracted from the first page of the selected PDF. The Rust backend extracts the largest embedded image from page 1 of the stored PDF, encodes it as a base64 data URI, and returns it to the frontend via the `get_pdf_cover` IPC command.
+
+- When a cover image is found, it is displayed centred within a bordered container with a light background, along with the page count below.
+- When no embedded image is found on page 1, a fallback placeholder is shown: a file icon with "No cover image available" text and the page count.
+- A loading spinner is shown while the cover image is being extracted.
+- The preview updates when a different document is selected in the document list.
+
+Note: This extracts embedded images (XObject images) from page 1, not a full page render. PDFs without embedded images on page 1 (e.g. text-only first pages) will show the fallback placeholder.
 
 ### FR-5: Detail Panel — Conversion Options (Per-Document Overrides)
 
@@ -92,6 +99,6 @@ The two-panel layout fills the available space. The document list has a fixed wi
 
 ## Out of Scope
 
-- Page-by-page PDF rendering in the preview area (requires backend command).
+- Full page-by-page PDF rendering with page navigation (the current preview extracts the cover image from page 1 only).
 - Drag-and-drop reordering of the document list.
 - Multi-select batch conversion from library (conversion is single-file from the detail panel).

@@ -130,6 +130,23 @@ Only keys explicitly present in `file.overrides` replace global values. Absent k
 }
 ```
 
+## PDF Cover Data (from Rust)
+
+Returned by the `get_pdf_cover` Tauri command. Extracts the largest embedded image from page 1 of the PDF and encodes it as a base64 data URI.
+
+```rust
+pub struct PdfCoverData {
+    pub cover_image: Option<String>, // base64 data URI, e.g. "data:image/jpeg;base64,..."
+}
+```
+
+```javascript
+// Frontend shape (camelCase)
+{
+  coverImage: string | null,
+}
+```
+
 ## PDF Metadata Shape (existing, from Rust)
 
 ```javascript
@@ -167,9 +184,10 @@ pub struct BookMetadata {
 }
 ```
 
-## Tauri Bridge Functions (persistence)
+## Tauri Bridge Functions
 
 | Function | Rust Command | Description |
 |---|---|---|
+| `getPdfCover(path)` | `get_pdf_cover` | Extracts the cover image from page 1 of a stored PDF, returns base64 data URI |
 | `saveBookMetadata(metadata)` | `save_book_metadata` | Writes `metadata.json` to the book's directory |
 | `listBooks()` | `list_books` | Scans all book directories and returns their metadata |

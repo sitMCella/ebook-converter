@@ -189,13 +189,13 @@ Below the import list, right-aligned:
 │  │   (left, 260 px)      │   (right, fills)         ││
 │  │                       │                          ││
 │  │  ▸ Design patterns    │  ┌────────────────────┐  ││
-│  │    Clean architecture │  │   Page Preview     │  ││
+│  │    Clean architecture │  │   Cover Preview    │  ││
 │  │    Pragmatic progr.   │  │                    │  ││
 │  │                       │  │   ┌──────────┐     │  ││
-│  │                       │  │   │  page    │     │  ││
-│  │                       │  │   │  render  │     │  ││
+│  │                       │  │   │  cover   │     │  ││
+│  │                       │  │   │  image   │     │  ││
 │  │                       │  │   └──────────┘     │  ││
-│  │                       │  │   ◀ Page 1/384 ▶   │  ││
+│  │                       │  │    384 pages       │  ││
 │  │                       │  └────────────────────┘  ││
 │  │                       │                          ││
 │  │                       │  Metadata                ││
@@ -235,16 +235,15 @@ Below the import list, right-aligned:
 
 Occupies the remaining width. Divided into three vertical sections.
 
-#### Section A — Page Preview
+#### Section A — Cover Page Preview
 
-- A rendered preview of the selected PDF page.
-- The page is displayed centred within a bordered container with a light background.
-- Below the preview: navigation controls.
-  - Left arrow button (previous page).
-  - Page indicator: "Page N of M" (muted text, 12 px).
-  - Right arrow button (next page).
-- Keyboard navigation: Left/Right arrow keys change pages when the preview is focused.
-- The preview renders the PDF page as an image or via a canvas element. The Rust backend extracts the page and sends it to the frontend as a base64-encoded image or via a streaming mechanism.
+- Displays the cover image extracted from the first page of the selected PDF.
+- The cover image is displayed centred within a bordered container with a light background (`--surface-2`).
+- Below the image: page count indicator (muted text, 12 px): "N pages".
+- A loading spinner is shown while the cover image is being extracted from the PDF.
+- The Rust backend extracts the largest embedded image from page 1 of the stored PDF and returns it as a base64-encoded data URI.
+- **Fallback**: when no embedded image is found on page 1 (e.g. text-only first pages), a placeholder is shown with a `FileText` icon and "No cover image available" text, along with the page count.
+- **Future enhancement**: full page-by-page rendering with navigation controls would require a PDF rendering library (pdfium, mupdf, or similar) and is out of scope for v1.
 
 #### Section B — Metadata
 
@@ -294,9 +293,8 @@ This section implements the per-document override model described below in the "
 
 | Action | Result |
 |---|---|
-| Click document in list | Selects it; detail panel updates with preview, metadata, and conversion options. |
+| Click document in list | Selects it; detail panel updates with cover preview, metadata, and conversion options. |
 | Type in search field | Document list filters in real time (case-insensitive substring match on file name). |
-| Click page navigation arrows | Preview updates to the next/previous page. |
 | Expand "Conversion options" | Override controls become visible. |
 | Change an override value | The override is saved immediately (no separate save button). A "(default)" label is removed and a reset button appears. |
 | Click reset on an override | The value reverts to the global default. |
@@ -730,7 +728,7 @@ Toasts stack vertically (newest on top, max 3 visible). Each toast has a manual 
 |---|---|---|
 | `Tab` / `Shift+Tab` | Global | Move focus between interactive elements in reading order. |
 | `Enter` / `Space` | Button focused | Activate the button. |
-| `Arrow Left` / `Arrow Right` | Page preview focused | Navigate pages (Library). |
+| `Arrow Left` / `Arrow Right` | Page preview focused | Navigate pages (Library, future — page-by-page rendering). |
 | `Escape` | Dialog open | Close the dialog. |
 | `Cmd/Ctrl + O` | Global | Open the file picker (same as "Browse files"). |
 | `Cmd/Ctrl + ,` | Global | Navigate to Settings. |

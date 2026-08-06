@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../../lib/tauri', async (importOriginal) => ({
   ...(await importOriginal()),
   listBooks: vi.fn().mockResolvedValue([]),
+  getPdfCover: vi.fn().mockResolvedValue({ coverImage: null }),
 }));
 
 vi.mock('../../lib/settings', async () => {
@@ -205,9 +206,9 @@ describe('LibraryScreen', () => {
     expect(screen.queryByText('Ready')).not.toBeInTheDocument();
   });
 
-  it('shows page preview placeholder', async () => {
+  it('shows page preview placeholder when no cover image is available', async () => {
     await renderLibrary();
-    expect(screen.getByText(/page preview not yet available/i)).toBeInTheDocument();
+    expect(screen.getByText(/no cover image available/i)).toBeInTheDocument();
   });
 
   it('hides metadata rows when values are absent', async () => {

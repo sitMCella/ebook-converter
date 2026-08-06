@@ -118,7 +118,7 @@ test.describe('Library Screen — Document Selection', () => {
 
   test('selected document shows its details in the detail panel', async ({ page }) => {
     await page.getByRole('option').filter({ hasText: 'doc-two.pdf' }).click();
-    await expect(page.getByText('Page preview not yet available')).toBeVisible();
+    await expect(page.getByText('No cover image available')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
   });
 });
@@ -180,8 +180,8 @@ test.describe('Library Screen — Detail Panel', () => {
     await stageAndImportToLibrary(page, 'details-test.pdf');
   });
 
-  test('shows page preview placeholder', async ({ page }) => {
-    await expect(page.getByText('Page preview not yet available')).toBeVisible();
+  test('shows page preview placeholder when no cover image is available', async ({ page }) => {
+    await expect(page.getByText('No cover image available')).toBeVisible();
   });
 
   test('shows metadata section heading', async ({ page }) => {
