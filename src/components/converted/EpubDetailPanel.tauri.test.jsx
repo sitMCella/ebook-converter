@@ -24,7 +24,6 @@ const baseFile = {
   outputPath: '/output/Design patterns.epub',
   conversionResult: {
     outputPath: '/output/Design patterns.epub',
-    chapters: 23,
     images: 47,
     fileSize: 3250585,
   },

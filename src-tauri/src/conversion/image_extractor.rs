@@ -10,6 +10,94 @@ pub struct ExtractedImage {
     pub height: u32,
 }
 
+pub fn extract_cover_image(
+    path: &str,
+    cover_mode: &str,
+) -> Result<Option<ExtractedImage>, String> {
+    if cover_mode == "none" {
+        return Ok(None);
+    }
+
+    let doc = Document::load(path)
+        .map_err(|e| format!("Failed to load PDF for cover extraction: {}", e))?;
+
+    let pages = doc.get_pages();
+    let first_page_id = match pages.get(&1) {
+        Some(id) => *id,
+        None => return Ok(None),
+    };
+
+    let resources = match get_page_resources(&doc, first_page_id) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+
+    let xobjects = match get_xobjects(&doc, &resources) {
+        Some(x) => x,
+        None => return Ok(None),
+    };
+
+    let mut best_image: Option<ExtractedImage> = None;
+    let mut best_area: u64 = 0;
+    let mut image_counter = 0u32;
+
+    let cover_options = ImageOptions {
+        extract_images: true,
+        image_quality: "high".to_string(),
+        max_image_width: 1600,
+        convert_to_webp: false,
+    };
+
+    for (name, obj_ref) in &xobjects {
+        let object = match resolve_object(&doc, obj_ref) {
+            Some(o) => o,
+            None => continue,
+        };
+
+        if !is_image_xobject(&doc, &object) {
+            continue;
+        }
+
+        let stream = match object.as_stream() {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+
+        image_counter += 1;
+        let name_str = String::from_utf8_lossy(name).to_string();
+        let image_id = format!("cover_{}", name_str);
+
+        match extract_single_image(stream, &image_id, image_counter, &cover_options) {
+            Ok(img) => {
+                let area = img.width as u64 * img.height as u64;
+                if area > best_area {
+                    best_area = area;
+                    best_image = Some(img);
+                }
+            }
+            Err(e) => {
+                log::warn!("Skipping potential cover image {}: {}", name_str, e);
+            }
+        }
+    }
+
+    match cover_mode {
+        "firstPage" => Ok(best_image),
+        "auto" => {
+            if let Some(ref img) = best_image {
+                if img.width >= 300 && img.height >= 400 {
+                    Ok(best_image)
+                } else {
+                    Ok(None)
+                }
+            } else {
+                Ok(None)
+            }
+        }
+        _ => Ok(None),
+    }
+}
+
 pub fn extract_images(
     path: &str,
     options: &ImageOptions,
@@ -349,4 +437,394 @@ fn get_dict_int(dict: &lopdf::Dictionary, key: &[u8]) -> Option<i64> {
         Object::Integer(i) => Some(*i),
         _ => None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use lopdf::{dictionary, Stream};
+    use tempfile::NamedTempFile;
+
+    fn create_jpeg_data(width: u32, height: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_pixel(width, height, image::Rgb([100, 150, 200]));
+        let dynamic = image::DynamicImage::ImageRgb8(img);
+        let mut buf = std::io::Cursor::new(Vec::new());
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 50);
+        dynamic.write_with_encoder(encoder).unwrap();
+        buf.into_inner()
+    }
+
+    fn create_pdf_with_image(img_width: u32, img_height: u32) -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let jpeg_data = create_jpeg_data(img_width, img_height);
+        let img_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(img_width as i64),
+                "Height" => Object::Integer(img_height as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg_data,
+        );
+        let img_id = doc.add_object(Object::Stream(img_stream));
+
+        let xobjects = dictionary! {
+            "Im0" => img_id,
+        };
+        let resources = dictionary! {
+            "XObject" => xobjects,
+        };
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    fn create_pdf_with_two_images(
+        w1: u32, h1: u32,
+        w2: u32, h2: u32,
+    ) -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let jpeg1 = create_jpeg_data(w1, h1);
+        let img1 = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(w1 as i64),
+                "Height" => Object::Integer(h1 as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg1,
+        );
+        let img1_id = doc.add_object(Object::Stream(img1));
+
+        let jpeg2 = create_jpeg_data(w2, h2);
+        let img2 = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(w2 as i64),
+                "Height" => Object::Integer(h2 as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg2,
+        );
+        let img2_id = doc.add_object(Object::Stream(img2));
+
+        let xobjects = dictionary! {
+            "Im0" => img1_id,
+            "Im1" => img2_id,
+        };
+        let resources = dictionary! {
+            "XObject" => xobjects,
+        };
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    fn create_pdf_no_images() -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    fn create_pdf_with_image_on_page_2_only(w: u32, h: u32) -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page1_id = doc.new_object_id();
+        let page2_id = doc.new_object_id();
+
+        let page1 = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page1_id, Object::Dictionary(page1));
+
+        let jpeg = create_jpeg_data(w, h);
+        let img_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(w as i64),
+                "Height" => Object::Integer(h as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg,
+        );
+        let img_id = doc.add_object(Object::Stream(img_stream));
+
+        let xobjects = dictionary! { "Im0" => img_id };
+        let resources = dictionary! { "XObject" => xobjects };
+
+        let page2 = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page2_id, Object::Dictionary(page2));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page1_id.into(), page2_id.into()],
+            "Count" => Object::Integer(2),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    // -- cover_mode = "none" --
+
+    #[test]
+    fn cover_none_returns_none() {
+        let result = extract_cover_image("/nonexistent.pdf", "none").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_none_skips_pdf_with_images() {
+        let file = create_pdf_with_image(600, 800);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "none").unwrap();
+        assert!(result.is_none());
+    }
+
+    // -- cover_mode = "auto" --
+
+    #[test]
+    fn cover_auto_returns_large_image() {
+        let file = create_pdf_with_image(600, 800);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_some());
+        let img = result.unwrap();
+        assert!(img.width >= 300);
+        assert!(img.height >= 400);
+    }
+
+    #[test]
+    fn cover_auto_rejects_small_image() {
+        let file = create_pdf_with_image(100, 100);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_rejects_narrow_image() {
+        let file = create_pdf_with_image(200, 800);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_rejects_short_image() {
+        let file = create_pdf_with_image(600, 200);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_at_exact_threshold() {
+        let file = create_pdf_with_image(300, 400);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn cover_auto_just_below_threshold_width() {
+        let file = create_pdf_with_image(299, 400);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_just_below_threshold_height() {
+        let file = create_pdf_with_image(300, 399);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_returns_none_for_no_images() {
+        let file = create_pdf_no_images();
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_only_checks_page_1() {
+        let file = create_pdf_with_image_on_page_2_only(600, 800);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
+        assert!(result.is_none());
+    }
+
+    // -- cover_mode = "firstPage" --
+
+    #[test]
+    fn cover_firstpage_returns_any_size_image() {
+        let file = create_pdf_with_image(50, 50);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn cover_firstpage_returns_none_for_no_images() {
+        let file = create_pdf_no_images();
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_firstpage_only_checks_page_1() {
+        let file = create_pdf_with_image_on_page_2_only(600, 800);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_firstpage_picks_largest_image() {
+        let file = create_pdf_with_two_images(100, 100, 400, 500);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert!(img.width >= 400);
+        assert!(img.height >= 500);
+    }
+
+    // -- invalid inputs --
+
+    #[test]
+    fn cover_invalid_path_returns_error() {
+        let result = extract_cover_image("/nonexistent.pdf", "auto");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cover_firstpage_invalid_path_returns_error() {
+        let result = extract_cover_image("/nonexistent.pdf", "firstPage");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn cover_unknown_mode_returns_none() {
+        let file = create_pdf_with_image(600, 800);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "unknown").unwrap();
+        assert!(result.is_none());
+    }
+
+    // -- cover image properties --
+
+    #[test]
+    fn cover_image_has_jpeg_mime_type() {
+        let file = create_pdf_with_image(400, 500);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert_eq!(img.mime_type, "image/jpeg");
+    }
+
+    #[test]
+    fn cover_image_id_contains_cover_prefix() {
+        let file = create_pdf_with_image(400, 500);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert!(img.id.contains("cover_"));
+    }
+
+    #[test]
+    fn cover_image_has_nonempty_data() {
+        let file = create_pdf_with_image(400, 500);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert!(!img.data.is_empty());
+    }
 }

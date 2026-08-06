@@ -21,10 +21,9 @@
 
 ### T3: Create Detail Panel
 - [x] Create `src/components/converted/EpubDetailPanel.jsx` as the right panel container
-- [x] Create `src/components/converted/EpubPreview.jsx` with placeholder UI (Book icon + chapter count)
-- [x] Create `src/components/converted/EpubMetadata.jsx` with labelled properties (Source, EPUB size, Chapters, Images, Settings used)
+- [x] Create `src/components/converted/EpubPreview.jsx` with cover image display or placeholder
+- [x] Create `src/components/converted/EpubMetadata.jsx` with labelled properties (Source, EPUB size, Images, Settings used)
 - [x] Hide metadata rows when values are absent or zero
-- [x] Create `src/components/converted/TableOfContents.jsx` with collapsible placeholder
 
 ### T4: Action Buttons
 - [x] Add "Open in reader" primary button with ExternalLink icon
@@ -48,7 +47,7 @@
 ## Phase 3: Persistence
 
 ### T6b: Persist Conversion Results to Disk
-- [x] Add `output_path`, `chapters`, `images`, `epub_file_size` optional fields to Rust `BookMetadata` struct (with `#[serde(default)]` for backward compatibility)
+- [x] Add `output_path`, `images`, `epub_file_size` optional fields to Rust `BookMetadata` struct (with `#[serde(default)]` for backward compatibility)
 - [x] Call `saveBookMetadata` in `useConversion` after successful conversion with `status: 'converted'` and result data
 - [x] Restore `outputPath` and `conversionResult` in `LOAD_LIBRARY` reducer for books with `status === 'converted'`
 
@@ -69,7 +68,6 @@
 - [x] Test no-results message when search matches nothing
 - [x] Test EpubListItem selected and hover states
 - [x] Test EpubMetadata shows available fields, hides absent ones
-- [x] Test TableOfContents collapse/expand placeholder
 - [x] Test action buttons render correctly
 - [x] Test "Reconvert" button navigates to Library with correct route state
 - [x] Test auto-selection of first EPUB when none is selected
@@ -92,6 +90,6 @@
 - [x] Empty state shown when no files are converted, with a working "Go to Import" link
 - [x] Action buttons (Open in reader, Reconvert) render correctly
 - [x] "Reconvert" navigates to Library with the source PDF selected
-- [x] EPUB preview shows a placeholder with chapter count
+- [x] EPUB preview shows a cover image or placeholder
 - [x] Design matches Library screen patterns (spacing, typography, colours)
 - [x] Converted EPUB list persists across app restarts

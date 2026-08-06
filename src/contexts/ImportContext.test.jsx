@@ -483,13 +483,13 @@ describe('ImportContext', () => {
           type: 'SET_CONVERSION_RESULT',
           path: '/a.pdf',
           outputPath: '/output/a.epub',
-          result: { outputPath: '/output/a.epub', chapters: 5, images: 2, fileSize: 50000 },
+          result: { outputPath: '/output/a.epub', images: 2, fileSize: 50000 },
         });
       });
       const file = result.current.state.files.get('/a.pdf');
       expect(file.status).toBe('converted');
       expect(file.outputPath).toBe('/output/a.epub');
-      expect(file.conversionResult.chapters).toBe(5);
+      expect(file.conversionResult.images).toBe(2);
     });
   });
 

@@ -177,6 +177,14 @@ async function onConversionProgress(callback) {
   return () => {};
 }
 
+async function readEpubPreview(path) {
+  if (isTauri) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('read_epub_preview', { path });
+  }
+  return { coverImage: null };
+}
+
 async function openFileWithSystem(path) {
   if (isTauri) {
     try {
@@ -215,6 +223,7 @@ export {
   convertPdfToEpub,
   cancelConversion,
   onConversionProgress,
+  readEpubPreview,
   openFileWithSystem,
   openFolder,
 };

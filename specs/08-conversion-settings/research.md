@@ -224,9 +224,9 @@ The `role="switch"` and `aria-checked` attributes make it accessible. The `Space
 
 ### Keep Page Breaks
 
-PDF page breaks are captured by `pdf-extract` as form-feed characters (`\x0C`). The current pipeline (spec 04) uses these to split text into per-page arrays, then structure detection and chapter splitting happen across merged text.
+PDF page breaks are captured by `pdf-extract` as form-feed characters (`\x0C`). The current pipeline (spec 04) uses these to split text into per-page arrays, then structure detection happens across merged text.
 
-To preserve page breaks within chapters, the structure detector can emit a `PageBreak` variant in `StructuredContent`, and the EPUB generator can render it as a CSS `page-break-before: always` on a `<div>` or `<hr>` element. This is a common EPUB pattern for preserving source document structure.
+To preserve page breaks, the structure detector can emit a `PageBreak` variant in `StructuredContent`, and the EPUB generator can render it as a CSS `page-break-before: always` on a `<div>` or `<hr>` element. This is a common EPUB pattern for preserving source document structure.
 
 **Default OFF**: most users want reflowable content without artificial breaks. Useful for academic/legal documents where page boundaries matter.
 

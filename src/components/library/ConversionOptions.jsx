@@ -3,13 +3,6 @@ import { ChevronRight, ChevronDown, X } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
 import { useSettings } from '../../contexts/SettingsContext';
 
-const SPLIT_OPTIONS = [
-  { value: 'heading1', label: 'Heading level 1' },
-  { value: 'heading2', label: 'Heading level 2' },
-  { value: 'pageBreak', label: 'Page break' },
-  { value: 'none', label: 'None' },
-];
-
 const QUALITY_OPTIONS = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
@@ -19,6 +12,12 @@ const QUALITY_OPTIONS = [
 const PAGE_RANGE_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'custom', label: 'Custom' },
+];
+
+const COVER_PAGE_OPTIONS = [
+  { value: 'auto', label: 'Auto-detect' },
+  { value: 'firstPage', label: 'First page' },
+  { value: 'none', label: 'None' },
 ];
 
 function OverrideRow({ label, children }) {
@@ -173,16 +172,6 @@ export function ConversionOptions({ file }) {
 
       {expanded && (
         <div className="pl-6 pb-2 flex flex-col gap-1">
-          <OverrideRow label="Split chapters by">
-            <SelectControl
-              value={overrides.pageHandling?.splitChaptersBy}
-              defaultValue={globalSettings.pageHandling.splitChaptersBy}
-              options={SPLIT_OPTIONS}
-              onChange={(v) => setOverride('pageHandling', 'splitChaptersBy', v)}
-              onReset={() => resetOverride('pageHandling', 'splitChaptersBy')}
-            />
-          </OverrideRow>
-
           <OverrideRow label="Heading level threshold">
             <NumberControl
               value={overrides.structure?.headingLevelThreshold}
@@ -227,6 +216,16 @@ export function ConversionOptions({ file }) {
               options={PAGE_RANGE_OPTIONS}
               onChange={(v) => setOverride('pageHandling', 'pageRange', v)}
               onReset={() => resetOverride('pageHandling', 'pageRange')}
+            />
+          </OverrideRow>
+
+          <OverrideRow label="Cover page">
+            <SelectControl
+              value={overrides.pageHandling?.coverPage}
+              defaultValue={globalSettings.pageHandling.coverPage}
+              options={COVER_PAGE_OPTIONS}
+              onChange={(v) => setOverride('pageHandling', 'coverPage', v)}
+              onReset={() => resetOverride('pageHandling', 'coverPage')}
             />
           </OverrideRow>
         </div>

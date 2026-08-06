@@ -203,19 +203,6 @@ describe('SettingsScreen', () => {
     );
   });
 
-  it('disabling detect headings with heading-based split shows advisory toast', async () => {
-    const { toast } = await import('sonner');
-    await renderSettingsScreen();
-
-    const headingsToggle = screen.getByLabelText('Detect headings');
-    await userEvent.click(headingsToggle);
-
-    expect(headingsToggle).toHaveAttribute('aria-checked', 'false');
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringContaining('Chapter splitting by headings requires heading detection'),
-    );
-  });
-
   it('save indicator appears briefly after changing a setting', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await renderSettingsScreen();

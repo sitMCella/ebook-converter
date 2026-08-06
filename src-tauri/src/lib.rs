@@ -1,5 +1,6 @@
 mod pdf;
 mod conversion;
+mod epub_reader;
 mod storage;
 
 use std::collections::HashMap;
@@ -29,6 +30,7 @@ pub fn run() {
       storage::get_books_dir,
       storage::save_book_metadata,
       storage::list_books,
+      epub_reader::read_epub_preview,
       open_path,
     ])
     .setup(|app| {

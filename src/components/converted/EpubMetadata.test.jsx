@@ -7,7 +7,6 @@ const baseFile = {
   name: 'Design patterns.pdf',
   conversionResult: {
     outputPath: '/output/Design patterns.epub',
-    chapters: 23,
     images: 47,
     fileSize: 3250585,
   },
@@ -31,12 +30,6 @@ describe('EpubMetadata', () => {
     expect(screen.getByText('3.1 MB')).toBeInTheDocument();
   });
 
-  it('shows chapter count', () => {
-    render(<EpubMetadata file={baseFile} />);
-    expect(screen.getByText('Chapters')).toBeInTheDocument();
-    expect(screen.getByText('23')).toBeInTheDocument();
-  });
-
   it('shows images with "extracted" suffix', () => {
     render(<EpubMetadata file={baseFile} />);
     expect(screen.getByText('Images')).toBeInTheDocument();
@@ -56,15 +49,6 @@ describe('EpubMetadata', () => {
     };
     render(<EpubMetadata file={file} />);
     expect(screen.queryByText('EPUB size')).not.toBeInTheDocument();
-  });
-
-  it('hides Chapters row when chapters is zero', () => {
-    const file = {
-      ...baseFile,
-      conversionResult: { ...baseFile.conversionResult, chapters: 0 },
-    };
-    render(<EpubMetadata file={file} />);
-    expect(screen.queryByText('Chapters')).not.toBeInTheDocument();
   });
 
   it('hides Images row when images is zero', () => {
@@ -110,7 +94,30 @@ describe('EpubMetadata', () => {
     expect(screen.getByText('Default')).toBeInTheDocument();
     expect(screen.queryByText('Source')).not.toBeInTheDocument();
     expect(screen.queryByText('EPUB size')).not.toBeInTheDocument();
-    expect(screen.queryByText('Chapters')).not.toBeInTheDocument();
     expect(screen.queryByText('Images')).not.toBeInTheDocument();
+  });
+
+  it('shows Cover row when hasCover is true', () => {
+    const file = {
+      ...baseFile,
+      conversionResult: { ...baseFile.conversionResult, hasCover: true },
+    };
+    render(<EpubMetadata file={file} />);
+    expect(screen.getByText('Cover')).toBeInTheDocument();
+    expect(screen.getByText('Included')).toBeInTheDocument();
+  });
+
+  it('hides Cover row when hasCover is false', () => {
+    const file = {
+      ...baseFile,
+      conversionResult: { ...baseFile.conversionResult, hasCover: false },
+    };
+    render(<EpubMetadata file={file} />);
+    expect(screen.queryByText('Cover')).not.toBeInTheDocument();
+  });
+
+  it('hides Cover row when hasCover is undefined', () => {
+    render(<EpubMetadata file={baseFile} />);
+    expect(screen.queryByText('Cover')).not.toBeInTheDocument();
   });
 });

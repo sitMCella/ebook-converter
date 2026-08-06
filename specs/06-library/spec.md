@@ -48,7 +48,6 @@ A rendered preview of the selected PDF page. This requires a backend command to 
 A collapsible section showing overridable conversion settings. When expanded, it displays a subset of the global settings with per-document override controls:
 
 **Top-level overrides** (always visible when expanded):
-- Split chapters by (dropdown)
 - Heading level threshold (number)
 - Base font size (number)
 - Image quality (dropdown)

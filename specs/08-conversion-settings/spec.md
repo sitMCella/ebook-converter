@@ -35,7 +35,6 @@ The "Output location" group defined in spec 02 is not included — it was remove
 | Setting | Control | Default | Range | Description |
 |---|---|---|---|---|
 | Detect headings | Toggle | ON | — | Identify heading hierarchy from text patterns (font-size-aware detection in future versions). |
-| Detect table of contents | Toggle | ON | — | Find and parse the PDF's table of contents page(s) to generate EPUB navigation. |
 | Detect footnotes | Toggle | OFF | — | Identify footnotes and convert them to EPUB footnote markup. (Implementation deferred to future version; setting is exposed for forward compatibility.) |
 | Heading level threshold | Number | 3 | 1–6 | Maximum heading depth to detect. Level 1 = largest headings only; level 6 = all sizes. |
 | Paragraph detection | Toggle | ON | — | Merge text runs into semantic paragraphs based on spacing analysis. |
@@ -68,8 +67,7 @@ The "Output location" group defined in spec 02 is not included — it was remove
 |---|---|---|---|---|
 | Skip blank pages | Toggle | ON | — | Omit pages that contain no text or images from the EPUB output. |
 | Page range | Dropdown | All | All / Custom | Convert all pages or a custom range. When "Custom" is selected, two number inputs appear inline: "From page" and "To page". |
-| Split chapters by | Dropdown | Heading level 1 | Heading level 1 / Heading level 2 / Page break / None | How the converter decides where one EPUB chapter ends and the next begins. This is the primary chapter break strategy. |
-| Keep page breaks | Toggle | OFF | — | Preserve original PDF page breaks within chapters as CSS page-break markers (`page-break-before: always`). When ON, page transitions from the source PDF are visible in the EPUB as forced breaks. When OFF (default), content flows continuously within chapters. |
+| Keep page breaks | Toggle | OFF | — | Preserve original PDF page breaks as CSS page-break markers (`page-break-before: always`). When ON, page transitions from the source PDF are visible in the EPUB as forced breaks. When OFF (default), content flows continuously. |
 | Remove page numbers | Toggle | ON | — | Strip page number artifacts from extracted text. PDF text extraction often captures headers/footers with page numbers that are meaningless in reflowable EPUB. |
 | Cover page | Dropdown | Auto-detect | Auto-detect / First page / None | How to generate the EPUB cover. "Auto-detect" looks for a full-page image on page 1; "First page" renders page 1 as a cover image; "None" omits a cover entirely. |
 
@@ -89,7 +87,6 @@ Certain setting combinations trigger automatic adjustments or warnings:
 |---|---|
 | Enable "Convert to WebP" when EPUB version is EPUB 2 | Warning toast: "WebP images require EPUB 3. The EPUB version setting will be changed to EPUB 3." The EPUB version dropdown updates to EPUB 3 automatically. |
 | Change EPUB version to EPUB 2 when "Convert to WebP" is ON | "Convert to WebP" is automatically turned OFF. Warning toast: "WebP images are not supported in EPUB 2. Image conversion has been disabled." |
-| Disable "Detect headings" when "Split chapters by" is a heading-based option | Warning toast: "Chapter splitting by headings requires heading detection. Consider changing the split strategy." (No automatic change — the user may intend a specific combination.) |
 | Disable "Extract images" | "Image quality", "Max image width", and "Convert to WebP" controls become visually disabled (greyed out, non-interactive). |
 
 ### FR-10: Settings Context

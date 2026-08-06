@@ -166,5 +166,5 @@ const { settings: globalSettings } = useSettings();
 | Race condition between rapid changes and debounced saves | The debounce always fires with the latest state, not the state at the time of the change. Even if the user navigates away, the debounce flush runs. |
 | Corrupted settings file prevents app from loading | `loadSettings()` already catches parse errors and returns defaults. The SettingsContext handles this case identically. |
 | New settings break existing `settings.json` files | `mergeSettings()` fills missing keys with defaults. Old files missing `keepPageBreaks` etc. are seamlessly upgraded on next save. |
-| Cross-setting validation creates unexpected changes | Validation is limited to the WebP ↔ EPUB 2 conflict (the only hard dependency). Other warnings (heading detection + chapter split) are advisory-only, no automatic changes. |
+| Cross-setting validation creates unexpected changes | Validation is limited to the WebP ↔ EPUB 2 conflict (the only hard dependency). No automatic changes for other settings. |
 | Context re-renders entire app on every setting change | The settings object is replaced only when a setting actually changes. Components that don't use settings don't re-render. React's reconciliation handles this efficiently for the small number of settings consumers. |

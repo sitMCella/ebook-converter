@@ -31,7 +31,6 @@ const convertedFiles = [
     outputPath: '/output/Design patterns.epub',
     conversionResult: {
       outputPath: '/output/Design patterns.epub',
-      chapters: 23,
       images: 47,
       fileSize: 3250585,
     },
@@ -51,7 +50,6 @@ const convertedFiles = [
     outputPath: '/output/Pragmatic programmer.epub',
     conversionResult: {
       outputPath: '/output/Pragmatic programmer.epub',
-      chapters: 53,
       images: 12,
       fileSize: 4194304,
     },
@@ -145,7 +143,6 @@ describe('ConvertedScreen', () => {
   it('auto-selects the first EPUB and shows its metadata', () => {
     renderConverted();
     expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
-    expect(screen.getByText('23')).toBeInTheDocument();
     expect(screen.getByText('47 extracted')).toBeInTheDocument();
   });
 
@@ -157,7 +154,6 @@ describe('ConvertedScreen', () => {
     await user.click(within(listbox).getByText('Pragmatic programmer.epub'));
 
     expect(screen.getByText('Pragmatic programmer.pdf')).toBeInTheDocument();
-    expect(screen.getByText('53')).toBeInTheDocument();
     expect(screen.getByText('12 extracted')).toBeInTheDocument();
   });
 
@@ -185,19 +181,13 @@ describe('ConvertedScreen', () => {
 
   it('shows EPUB preview placeholder', () => {
     renderConverted();
-    expect(screen.getByText(/epub preview not yet available/i)).toBeInTheDocument();
-  });
-
-  it('shows chapter count in preview', () => {
-    renderConverted();
-    expect(screen.getByText('23 chapters')).toBeInTheDocument();
+    expect(screen.getByText(/no cover image available/i)).toBeInTheDocument();
   });
 
   it('shows metadata section with EPUB details', () => {
     renderConverted();
     expect(screen.getByText('Source')).toBeInTheDocument();
     expect(screen.getByText('EPUB size')).toBeInTheDocument();
-    expect(screen.getByText('Chapters')).toBeInTheDocument();
     expect(screen.getByText('Images')).toBeInTheDocument();
     expect(screen.getByText('Settings used')).toBeInTheDocument();
     expect(screen.getByText('Default')).toBeInTheDocument();
@@ -229,17 +219,6 @@ describe('ConvertedScreen', () => {
     ];
     renderConverted({ files: filesNoImages });
     expect(screen.queryByText('Images')).not.toBeInTheDocument();
-  });
-
-  it('shows table of contents empty state when no toc data', async () => {
-    const user = userEvent.setup();
-    renderConverted();
-
-    const tocButton = screen.getByText('Table of contents');
-    expect(tocButton).toBeInTheDocument();
-
-    await user.click(tocButton);
-    expect(screen.getByText(/no chapters detected/i)).toBeInTheDocument();
   });
 
   it('shows "Reconvert" button that navigates to library', async () => {

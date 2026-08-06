@@ -33,14 +33,13 @@ function getSettingsLabel(file) {
 export function EpubMetadata({ file }) {
   const result = file.conversionResult;
   const epubSize = result?.fileSize ?? 0;
-  const chapters = result?.chapters ?? 0;
   const images = result?.images ?? 0;
 
   const rows = [
     { label: 'Source', value: file.name },
     { label: 'EPUB size', value: epubSize > 0 ? formatFileSize(epubSize) : null },
-    { label: 'Chapters', value: chapters > 0 ? chapters : null },
     { label: 'Images', value: images > 0 ? `${images} extracted` : null },
+    { label: 'Cover', value: result?.hasCover ? 'Included' : null },
     { label: 'Settings used', value: getSettingsLabel(file) },
   ];
 

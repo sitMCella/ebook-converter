@@ -1,4 +1,3 @@
-use super::chapter_splitter;
 use super::epub_generator;
 use super::image_extractor;
 use super::structure_detector;
@@ -6,6 +5,7 @@ use super::text_extractor;
 use super::{ConversionOptions, ConversionProgress, ConversionResult};
 use crate::pdf;
 use crate::storage;
+use lopdf::Document;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::Emitter;
@@ -25,9 +25,30 @@ pub async fn run_conversion(
         return Err("Conversion cancelled".to_string());
     }
 
-    let pages = text_extractor::extract_text(path, &options.page_handling)?;
+    let mut pages = text_extractor::extract_text(path, &options.page_handling)?;
 
     if pages.is_empty() {
+        return Err("No text could be extracted from the PDF".to_string());
+    }
+
+    let cover_image = match image_extractor::extract_cover_image(path, &options.page_handling.cover_page) {
+        Ok(img) => img,
+        Err(e) => {
+            log::warn!("Cover extraction failed: {}", e);
+            None
+        }
+    };
+
+    if cover_image.is_some() && pages.len() > 1 {
+        let pdf_page_count = Document::load(path)
+            .map(|doc| doc.get_pages().len())
+            .unwrap_or(0);
+        if pages.len() >= pdf_page_count {
+            pages.remove(0);
+        }
+    }
+
+    if pages.is_empty() && cover_image.is_none() {
         return Err("No text could be extracted from the PDF".to_string());
     }
 
@@ -88,22 +109,6 @@ pub async fn run_conversion(
         return Err("Conversion cancelled".to_string());
     }
 
-    emit_progress(app, &path_owned, "splitting_chapters", 70, "Splitting into chapters...");
-
-    let chapters = chapter_splitter::split_chapters(content, &options.page_handling);
-
-    emit_progress(
-        app,
-        &path_owned,
-        "splitting_chapters",
-        80,
-        &format!("Split into {} chapters", chapters.len()),
-    );
-
-    if cancel_token.load(Ordering::Relaxed) {
-        return Err("Conversion cancelled".to_string());
-    }
-
     emit_progress(app, &path_owned, "assembling_epub", 80, "Generating EPUB structure...");
 
     let output_path = if let Some(ref book_id) = options.book_id {
@@ -124,12 +129,7 @@ pub async fn run_conversion(
 
     emit_progress(app, &path_owned, "assembling_epub", 90, "Writing EPUB file...");
 
-    let mut result = epub_generator::generate_epub(&chapters, &images, &metadata, options, &output_path)?;
-
-    let pdf_outline = pdf::extract_outline(path);
-    if !pdf_outline.is_empty() {
-        result.toc = pdf_outline;
-    }
+    let result = epub_generator::generate_epub(&content, &images, cover_image.as_ref(), &metadata, options, &output_path)?;
 
     emit_progress(app, &path_owned, "complete", 100, "Conversion complete.");
 

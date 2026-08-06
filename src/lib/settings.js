@@ -3,7 +3,6 @@ import { isTauri } from './tauri';
 export const DEFAULT_SETTINGS = {
   structure: {
     detectHeadings: true,
-    detectToc: true,
     detectFootnotes: false,
     headingLevelThreshold: 3,
     paragraphDetection: true,
@@ -29,7 +28,6 @@ export const DEFAULT_SETTINGS = {
     pageRange: 'all',
     pageRangeFrom: null,
     pageRangeTo: null,
-    splitChaptersBy: 'heading1',
     keepPageBreaks: false,
     removePageNumbers: true,
     coverPage: 'auto',

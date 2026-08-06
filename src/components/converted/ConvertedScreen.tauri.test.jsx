@@ -33,7 +33,6 @@ const convertedFiles = [
     outputPath: '/app-data/books/abc-123/Design patterns.epub',
     conversionResult: {
       outputPath: '/app-data/books/abc-123/Design patterns.epub',
-      chapters: 23,
       images: 47,
       fileSize: 3250585,
     },
