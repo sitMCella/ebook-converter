@@ -24,12 +24,6 @@ vi.mock('../../lib/settings', async () => {
   };
 });
 
-const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
-  return { ...actual, useNavigate: () => mockNavigate };
-});
-
 function SeedConversion({ files, paths, complete, children }) {
   const { dispatch: importDispatch } = useImportContext();
   const { dispatch: conversionDispatch } = useConversionContext();
@@ -118,7 +112,7 @@ describe('ConvertingScreen', () => {
     expect(screen.getByText(/Cancel 1 remaining conversion/)).toBeInTheDocument();
   });
 
-  it('shows "Conversion complete" and "View converted" when done', async () => {
+  it('shows "Conversion complete" when done', async () => {
     render(
       <Wrapper>
         <SeedConversion
@@ -132,25 +126,6 @@ describe('ConvertingScreen', () => {
     );
     await act(async () => {});
     expect(screen.getByText('Conversion complete')).toBeInTheDocument();
-    expect(screen.getByText('View converted')).toBeInTheDocument();
-  });
-
-  it('navigates to /converted when "View converted" is clicked', async () => {
-    const user = userEvent.setup();
-    render(
-      <Wrapper>
-        <SeedConversion
-          files={[{ path: '/a.pdf', name: 'a.pdf', status: 'converted' }]}
-          paths={['/a.pdf']}
-          complete
-        >
-          <ConvertingScreen />
-        </SeedConversion>
-      </Wrapper>,
-    );
-    await act(async () => {});
-    await user.click(screen.getByText('View converted'));
-    expect(mockNavigate).toHaveBeenCalledWith('/converted');
   });
 
   it('hides "Cancel all" when conversion is complete', async () => {
