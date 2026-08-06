@@ -30,7 +30,7 @@ function OverrideRow({ label, children }) {
 }
 
 function SelectControl({ value, defaultValue, options, onChange, onReset }) {
-  const isOverridden = value !== undefined;
+  const isOverridden = value !== undefined && value !== defaultValue;
   const displayValue = isOverridden ? value : defaultValue;
 
   return (
@@ -75,7 +75,7 @@ function NumberControl({
   onReset,
   suffix = '',
 }) {
-  const isOverridden = value !== undefined;
+  const isOverridden = value !== undefined && value !== defaultValue;
   const displayValue = isOverridden ? value : defaultValue;
 
   return (
@@ -124,7 +124,7 @@ export function ConversionOptions({ file }) {
 
   const overrides = file.overrides || {};
 
-  const overrideCount = countOverrides(overrides);
+  const overrideCount = countOverrides(overrides, globalSettings);
 
   function setOverride(group, key, value) {
     const newOverrides = {
@@ -234,11 +234,16 @@ export function ConversionOptions({ file }) {
   );
 }
 
-function countOverrides(overrides) {
+function countOverrides(overrides, globalSettings) {
   let count = 0;
-  for (const group of Object.values(overrides)) {
+  for (const [groupKey, group] of Object.entries(overrides)) {
     if (group && typeof group === 'object') {
-      count += Object.keys(group).length;
+      const globalGroup = globalSettings[groupKey];
+      for (const [key, value] of Object.entries(group)) {
+        if (globalGroup == null || value !== globalGroup[key]) {
+          count++;
+        }
+      }
     }
   }
   return count;
