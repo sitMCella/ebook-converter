@@ -193,6 +193,19 @@ describe('LibraryScreen', () => {
     expect(screen.queryByText('The Pragmatic Programmer')).not.toBeInTheDocument();
   });
 
+  it('filters document list by metadata title', async () => {
+    const user = userEvent.setup();
+    await renderLibrary();
+
+    const searchInput = screen.getByPlaceholderText('Search documents...');
+    await user.type(searchInput, 'pragmatic');
+
+    const listbox = screen.getByRole('listbox');
+    expect(within(listbox).getByText('The Pragmatic Programmer')).toBeInTheDocument();
+    expect(within(listbox).queryByText('Design Patterns')).not.toBeInTheDocument();
+    expect(within(listbox).queryByText('Clean Architecture')).not.toBeInTheDocument();
+  });
+
   it('shows "No documents match" when search has no results', async () => {
     const user = userEvent.setup();
     await renderLibrary();
