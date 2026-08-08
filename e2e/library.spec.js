@@ -119,7 +119,7 @@ test.describe('Library Screen — Document Selection', () => {
   test('selected document shows its details in the detail panel', async ({ page }) => {
     await page.getByRole('option').filter({ hasText: 'doc-two.pdf' }).click();
     await expect(page.getByText('No cover image available')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /metadata/i })).toBeVisible();
   });
 });
 
@@ -184,11 +184,12 @@ test.describe('Library Screen — Detail Panel', () => {
     await expect(page.getByText('No cover image available')).toBeVisible();
   });
 
-  test('shows metadata section heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
+  test('shows metadata section as collapsible button', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /metadata/i })).toBeVisible();
   });
 
-  test('shows format metadata from PDF validation', async ({ page }) => {
+  test('shows format metadata after expanding metadata section', async ({ page }) => {
+    await page.getByRole('button', { name: /metadata/i }).click();
     await expect(page.getByText('Format')).toBeVisible();
     await expect(page.getByText(/PDF \d/)).toBeVisible();
   });
