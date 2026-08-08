@@ -142,9 +142,10 @@ describe('LibraryScreen', () => {
 
   it('renders document list with all imported files', async () => {
     await renderLibrary();
-    expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
-    expect(screen.getByText('Clean architecture.pdf')).toBeInTheDocument();
-    expect(screen.getByText('Pragmatic programmer.pdf')).toBeInTheDocument();
+    const listbox = screen.getByRole('listbox');
+    expect(within(listbox).getByText('Design Patterns')).toBeInTheDocument();
+    expect(within(listbox).getByText('Clean Architecture')).toBeInTheDocument();
+    expect(within(listbox).getByText('The Pragmatic Programmer')).toBeInTheDocument();
   });
 
   it('renders header with title and search input', async () => {
@@ -164,7 +165,7 @@ describe('LibraryScreen', () => {
 
     await user.click(screen.getByRole('button', { name: /metadata/i }));
 
-    expect(screen.getByText('Design Patterns')).toBeInTheDocument();
+    expect(screen.getAllByText('Design Patterns').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Gamma, Helm, Johnson, Vlissides')).toBeInTheDocument();
     expect(screen.getByText('384')).toBeInTheDocument();
   });
@@ -174,7 +175,7 @@ describe('LibraryScreen', () => {
     await renderLibrary();
 
     const listbox = screen.getByRole('listbox');
-    const secondItem = within(listbox).getByText('Clean architecture.pdf');
+    const secondItem = within(listbox).getByText('Clean Architecture');
     await user.click(secondItem);
 
     expect(screen.getByText(/Clean Architecture · 432 pages/)).toBeInTheDocument();
@@ -187,9 +188,9 @@ describe('LibraryScreen', () => {
     const searchInput = screen.getByPlaceholderText('Search documents...');
     await user.type(searchInput, 'clean');
 
-    expect(screen.queryByText('Design patterns.pdf')).not.toBeInTheDocument();
-    expect(screen.getByText('Clean architecture.pdf')).toBeInTheDocument();
-    expect(screen.queryByText('Pragmatic programmer.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByText('Design Patterns')).not.toBeInTheDocument();
+    expect(screen.getByText('Clean Architecture')).toBeInTheDocument();
+    expect(screen.queryByText('The Pragmatic Programmer')).not.toBeInTheDocument();
   });
 
   it('shows "No documents match" when search has no results', async () => {
@@ -250,7 +251,7 @@ describe('LibraryScreen', () => {
     await renderLibrary();
 
     const listbox = screen.getByRole('listbox');
-    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+    await user.click(within(listbox).getByText('The Pragmatic Programmer'));
 
     expect(screen.getByText('Reconvert to EPUB')).toBeInTheDocument();
   });
@@ -260,7 +261,7 @@ describe('LibraryScreen', () => {
     await renderLibrary();
 
     const listbox = screen.getByRole('listbox');
-    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+    await user.click(within(listbox).getByText('The Pragmatic Programmer'));
 
     expect(screen.getByText('View EPUB')).toBeInTheDocument();
   });
@@ -275,7 +276,7 @@ describe('LibraryScreen', () => {
     await renderLibrary();
 
     const listbox = screen.getByRole('listbox');
-    await user.click(within(listbox).getByText('Pragmatic programmer.pdf'));
+    await user.click(within(listbox).getByText('The Pragmatic Programmer'));
     await user.click(screen.getByText('View EPUB'));
 
     expect(mockNavigate).toHaveBeenCalledWith('/converted', {

@@ -3,6 +3,12 @@ import { formatFileSize } from '../../lib/format';
 
 export function DocumentListItem({ file, selected, onSelect }) {
   const fileSize = file.metadata?.fileSize ?? file.size;
+  const title = file.metadata?.title || file.name;
+  const pageCount = file.metadata?.pageCount;
+
+  const secondaryParts = [];
+  if (pageCount) secondaryParts.push(`${pageCount} pages`);
+  if (fileSize > 0) secondaryParts.push(formatFileSize(fileSize));
 
   return (
     <button
@@ -17,14 +23,14 @@ export function DocumentListItem({ file, selected, onSelect }) {
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] truncate text-[var(--text-primary)]">
-          {file.name}
+        <span className="text-[13px] truncate text-[var(--text-primary)]" title={title}>
+          {title}
         </span>
         {file.status === 'error' && <StatusBadge status="error" />}
       </div>
-      {fileSize > 0 && (
+      {secondaryParts.length > 0 && (
         <span className="text-[12px] text-[var(--text-muted)] mt-0.5 block">
-          {formatFileSize(fileSize)}
+          {secondaryParts.join(' · ')}
         </span>
       )}
     </button>
