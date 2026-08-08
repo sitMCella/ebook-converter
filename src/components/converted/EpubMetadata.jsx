@@ -46,7 +46,12 @@ export function EpubMetadata({ file }) {
   const epubSize = result?.fileSize ?? 0;
   const images = result?.images ?? 0;
 
+  const epubName = file.outputPath
+    ? file.outputPath.split(/[\\/]/).pop()
+    : file.name?.replace(/\.pdf$/i, '.epub') || null;
+
   const rows = [
+    { label: 'File name', value: epubName },
     { label: 'Source', value: file.name },
     { label: 'EPUB size', value: epubSize > 0 ? formatFileSize(epubSize) : null },
     { label: 'Images', value: images > 0 ? `${images} extracted` : null },
