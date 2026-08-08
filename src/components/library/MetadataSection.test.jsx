@@ -90,7 +90,7 @@ describe('MetadataSection', () => {
 
     it('shows "No metadata available" when metadata is empty', async () => {
       const user = userEvent.setup();
-      const file = { ...baseFile, size: 0, metadata: {} };
+      const file = { ...baseFile, name: '', size: 0, metadata: {} };
       render(<MetadataSection file={file} />);
 
       await user.click(screen.getByRole('button', { name: /metadata/i }));

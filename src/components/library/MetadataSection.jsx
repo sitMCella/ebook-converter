@@ -28,6 +28,7 @@ export function MetadataSection({ file }) {
   const fileSize = meta?.fileSize ?? file.size;
 
   const rows = [
+    { label: 'File name', value: file.name },
     { label: 'Title', value: meta?.title },
     { label: 'Authors', value: meta?.author },
     { label: 'Pages', value: meta?.pageCount || null },
