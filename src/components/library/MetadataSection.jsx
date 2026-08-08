@@ -15,11 +15,10 @@ function MetadataRow({ label, value }) {
   );
 }
 
-function buildSummary(meta, fileSize) {
+function buildSummary(meta) {
   const parts = [];
   if (meta?.title) parts.push(meta.title);
   if (meta?.pageCount) parts.push(`${meta.pageCount} pages`);
-  if (fileSize > 0) parts.push(formatFileSize(fileSize));
   return parts.join(' · ');
 }
 
@@ -40,7 +39,7 @@ export function MetadataSection({ file }) {
   ];
 
   const visibleRows = rows.filter((r) => r.value != null && r.value !== '');
-  const summary = buildSummary(meta, fileSize);
+  const summary = buildSummary(meta);
 
   return (
     <div>
