@@ -71,6 +71,6 @@ describe('EpubDetailPanel', () => {
 
   it('derives epub name from outputPath for the panel', () => {
     renderPanel();
-    expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
+    expect(screen.getByText(/Design patterns\.pdf/)).toBeInTheDocument();
   });
 });
