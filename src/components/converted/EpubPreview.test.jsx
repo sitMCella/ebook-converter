@@ -78,4 +78,34 @@ describe('EpubPreview in Tauri', () => {
 
     tauri.isTauri = false;
   });
+
+  it('shows placeholder when getPdfCover rejects', async () => {
+    const tauri = await import('../../lib/tauri');
+    tauri.isTauri = true;
+    tauri.getPdfCover.mockRejectedValue(new Error('Read failed'));
+
+    const file = { storedPdfPath: '/path/to/book.pdf' };
+    render(<EpubPreview file={file} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No cover image available')).toBeInTheDocument();
+    });
+
+    tauri.isTauri = false;
+  });
+
+  it('calls getPdfCover with storedPdfPath', async () => {
+    const tauri = await import('../../lib/tauri');
+    tauri.isTauri = true;
+    tauri.getPdfCover.mockResolvedValue({ coverImage: null });
+
+    const file = { storedPdfPath: '/data/books/abc/source.pdf' };
+    render(<EpubPreview file={file} />);
+
+    await waitFor(() => {
+      expect(tauri.getPdfCover).toHaveBeenCalledWith('/data/books/abc/source.pdf');
+    });
+
+    tauri.isTauri = false;
+  });
 });

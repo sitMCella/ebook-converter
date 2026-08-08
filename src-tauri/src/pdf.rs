@@ -746,6 +746,118 @@ mod tests {
         assert_eq!(metadata.title.as_deref(), Some("Info Title"));
     }
 
+    // -- get_pdf_cover caching tests --
+
+    fn create_pdf_with_image(dir: &std::path::Path, filename: &str, width: u32, height: u32) -> std::path::PathBuf {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let img = image::RgbImage::from_pixel(width, height, image::Rgb([100, 150, 200]));
+        let dynamic = image::DynamicImage::ImageRgb8(img);
+        let mut buf = std::io::Cursor::new(Vec::new());
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 50);
+        dynamic.write_with_encoder(encoder).unwrap();
+        let jpeg_data = buf.into_inner();
+
+        let img_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(width as i64),
+                "Height" => Object::Integer(height as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg_data,
+        );
+        let img_id = doc.add_object(Object::Stream(img_stream));
+
+        let xobjects = dictionary! { "Im0" => img_id };
+        let resources = dictionary! { "XObject" => xobjects };
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let path = dir.join(filename);
+        doc.save(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn get_pdf_cover_returns_cached_png_when_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf_path = create_pdf_with_image(dir.path(), "source.pdf", 400, 500);
+
+        let img = image::RgbImage::from_pixel(10, 10, image::Rgb([255, 0, 0]));
+        let cover_path = dir.path().join("cover.png");
+        img.save(&cover_path).unwrap();
+
+        let result = get_pdf_cover(pdf_path.to_str().unwrap().to_string()).unwrap();
+        assert!(result.cover_image.is_some());
+        let data_uri = result.cover_image.unwrap();
+        assert!(data_uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    fn get_pdf_cover_falls_back_to_extraction_without_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf_path = create_pdf_with_image(dir.path(), "source.pdf", 400, 500);
+
+        let cached = dir.path().join("cover.png");
+        assert!(!cached.exists());
+
+        let result = get_pdf_cover(pdf_path.to_str().unwrap().to_string()).unwrap();
+        assert!(result.cover_image.is_some());
+        let data_uri = result.cover_image.unwrap();
+        assert!(data_uri.starts_with("data:image/jpeg;base64,"));
+    }
+
+    #[test]
+    fn get_pdf_cover_returns_none_when_no_cache_and_no_images() {
+        let file = create_valid_pdf();
+        let result = get_pdf_cover(file.path().to_str().unwrap().to_string()).unwrap();
+        assert!(result.cover_image.is_none());
+    }
+
+    #[test]
+    fn get_pdf_cover_prefers_cache_over_extraction() {
+        let dir = tempfile::tempdir().unwrap();
+        let pdf_path = create_pdf_with_image(dir.path(), "source.pdf", 400, 500);
+
+        let sentinel = image::RgbImage::from_pixel(1, 1, image::Rgb([0, 0, 0]));
+        let cover_path = dir.path().join("cover.png");
+        sentinel.save(&cover_path).unwrap();
+        let cached_size = std::fs::metadata(&cover_path).unwrap().len();
+
+        let result = get_pdf_cover(pdf_path.to_str().unwrap().to_string()).unwrap();
+        let data_uri = result.cover_image.unwrap();
+
+        use base64::Engine;
+        let b64_part = data_uri.strip_prefix("data:image/png;base64,").unwrap();
+        let decoded = base64::engine::general_purpose::STANDARD.decode(b64_part).unwrap();
+        assert_eq!(decoded.len() as u64, cached_size);
+    }
+
     // -- PdfValidation serialization tests --
 
     #[test]
