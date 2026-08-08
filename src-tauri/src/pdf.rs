@@ -99,17 +99,22 @@ pub fn get_pdf_metadata(path: String) -> Result<PdfMetadata, String> {
     let mut modified_date = None;
     let mut producer = None;
 
-    if let Ok(info_ref) = doc.trailer.get(b"Info") {
-        if let Ok(info_obj) = doc.get_object(info_ref.as_reference().unwrap_or_default()) {
-            if let lopdf::Object::Dictionary(ref dict) = *info_obj {
-                title = get_string_from_dict(dict, b"Title");
-                author = get_string_from_dict(dict, b"Author");
-                producer = get_string_from_dict(dict, b"Producer");
-                created_date =
-                    get_string_from_dict(dict, b"CreationDate").and_then(|s| parse_pdf_date(&s));
-                modified_date =
-                    get_string_from_dict(dict, b"ModDate").and_then(|s| parse_pdf_date(&s));
-            }
+    if let Ok(info_val) = doc.trailer.get(b"Info") {
+        let info_dict = resolve_dictionary(&doc, info_val);
+        if let Some(dict) = info_dict {
+            title = get_string_from_dict(dict, b"Title");
+            author = get_string_from_dict(dict, b"Author");
+            producer = get_string_from_dict(dict, b"Producer");
+            created_date =
+                get_string_from_dict(dict, b"CreationDate").and_then(|s| parse_pdf_date(&s));
+            modified_date =
+                get_string_from_dict(dict, b"ModDate").and_then(|s| parse_pdf_date(&s));
+        }
+    }
+
+    if title.is_none() {
+        if let Some(xmp_title) = extract_xmp_title(&doc) {
+            title = Some(xmp_title);
         }
     }
 
@@ -123,6 +128,64 @@ pub fn get_pdf_metadata(path: String) -> Result<PdfMetadata, String> {
         producer,
         file_size,
     })
+}
+
+fn resolve_dictionary<'a>(doc: &'a Document, obj: &'a lopdf::Object) -> Option<&'a lopdf::Dictionary> {
+    match obj {
+        lopdf::Object::Dictionary(dict) => Some(dict),
+        lopdf::Object::Reference(ref_id) => {
+            if let Ok(resolved) = doc.get_object(*ref_id) {
+                if let lopdf::Object::Dictionary(dict) = resolved {
+                    return Some(dict);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn extract_xmp_title(doc: &Document) -> Option<String> {
+    let root_ref = doc.trailer.get(b"Root").ok()?;
+    let catalog = resolve_dictionary(doc, root_ref)?;
+    let meta_ref = catalog.get(b"Metadata").ok()?;
+
+    let meta_obj = match meta_ref {
+        lopdf::Object::Reference(ref_id) => doc.get_object(*ref_id).ok()?,
+        other => other,
+    };
+
+    let xmp_bytes = match meta_obj {
+        lopdf::Object::Stream(stream) => {
+            stream.decompressed_content().unwrap_or_else(|_| stream.content.clone())
+        }
+        _ => return None,
+    };
+
+    let xmp_str = String::from_utf8_lossy(&xmp_bytes);
+
+    extract_xmp_tag(&xmp_str, "dc:title")
+}
+
+fn extract_xmp_tag(xmp: &str, tag: &str) -> Option<String> {
+    let open = format!("<{}", tag);
+    let close = format!("</{}>", tag);
+    let start = xmp.find(&open)?;
+    let end = xmp[start..].find(&close)? + start;
+    let inner = &xmp[start..end];
+
+    // Look for <rdf:li> content inside the tag
+    if let Some(li_start) = inner.find("<rdf:li") {
+        let content_start = inner[li_start..].find('>')? + li_start + 1;
+        let content_end = inner[content_start..].find("</rdf:li")? + content_start;
+        let value = inner[content_start..content_end].trim();
+        if value.is_empty() { None } else { Some(value.to_string()) }
+    } else {
+        // Fallback: content directly inside the tag
+        let content_start = inner.find('>')? + 1;
+        let value = inner[content_start..].trim();
+        if value.is_empty() { None } else { Some(value.to_string()) }
+    }
 }
 
 fn get_string_from_dict(dict: &lopdf::Dictionary, key: &[u8]) -> Option<String> {
@@ -496,6 +559,178 @@ mod tests {
             "Title" => Object::String(bytes, lopdf::StringFormat::Literal),
         };
         assert_eq!(get_string_from_dict(&dict, b"Title"), Some("Hi".to_string()));
+    }
+
+    // -- extract_xmp_tag tests --
+
+    #[test]
+    fn extract_xmp_tag_with_rdf_li() {
+        let xmp = r#"<dc:title><rdf:Alt><rdf:li xml:lang="x-default">My Book Title</rdf:li></rdf:Alt></dc:title>"#;
+        assert_eq!(extract_xmp_tag(xmp, "dc:title"), Some("My Book Title".to_string()));
+    }
+
+    #[test]
+    fn extract_xmp_tag_direct_content() {
+        let xmp = r#"<dc:title>Direct Title</dc:title>"#;
+        assert_eq!(extract_xmp_tag(xmp, "dc:title"), Some("Direct Title".to_string()));
+    }
+
+    #[test]
+    fn extract_xmp_tag_missing_tag() {
+        let xmp = r#"<dc:creator>Some Author</dc:creator>"#;
+        assert_eq!(extract_xmp_tag(xmp, "dc:title"), None);
+    }
+
+    #[test]
+    fn extract_xmp_tag_empty_content() {
+        let xmp = r#"<dc:title><rdf:Alt><rdf:li xml:lang="x-default">   </rdf:li></rdf:Alt></dc:title>"#;
+        assert_eq!(extract_xmp_tag(xmp, "dc:title"), None);
+    }
+
+    #[test]
+    fn extract_xmp_tag_multiline() {
+        let xmp = r#"
+            <rdf:Description>
+                <dc:title>
+                    <rdf:Alt>
+                        <rdf:li xml:lang="x-default">Multiline Title</rdf:li>
+                    </rdf:Alt>
+                </dc:title>
+            </rdf:Description>
+        "#;
+        assert_eq!(extract_xmp_tag(xmp, "dc:title"), Some("Multiline Title".to_string()));
+    }
+
+    // -- resolve_dictionary tests --
+
+    #[test]
+    fn resolve_dictionary_direct() {
+        let doc = Document::with_version("1.7");
+        let dict = dictionary! { "Key" => "Value" };
+        let obj = Object::Dictionary(dict);
+        let result = resolve_dictionary(&doc, &obj);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn resolve_dictionary_indirect() {
+        let mut doc = Document::with_version("1.7");
+        let dict = dictionary! { "Key" => "Value" };
+        let id = doc.add_object(Object::Dictionary(dict));
+        let ref_obj = Object::Reference(id);
+        let result = resolve_dictionary(&doc, &ref_obj);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn resolve_dictionary_non_dict() {
+        let doc = Document::with_version("1.7");
+        let obj = Object::Integer(42);
+        let result = resolve_dictionary(&doc, &obj);
+        assert!(result.is_none());
+    }
+
+    // -- XMP fallback integration test --
+
+    #[test]
+    fn get_pdf_metadata_falls_back_to_xmp_title() {
+        let mut doc = Document::with_version("2.0");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let xmp_content = br#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">
+      <dc:title>
+        <rdf:Alt>
+          <rdf:li xml:lang="x-default">XMP Only Title</rdf:li>
+        </rdf:Alt>
+      </dc:title>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>"#;
+
+        let xmp_stream = Stream::new(
+            dictionary! { "Type" => "Metadata", "Subtype" => "XML" },
+            xmp_content.to_vec(),
+        );
+        let xmp_id = doc.add_object(xmp_stream);
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+            "Metadata" => xmp_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+
+        let metadata = get_pdf_metadata(file.path().to_str().unwrap().to_string()).unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("XMP Only Title"));
+    }
+
+    #[test]
+    fn get_pdf_metadata_prefers_info_title_over_xmp() {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let info = dictionary! {
+            "Title" => Object::String(b"Info Title".to_vec(), lopdf::StringFormat::Literal),
+        };
+        let info_id = doc.add_object(info);
+        doc.trailer.set("Info", info_id);
+
+        let xmp_content = b"<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">XMP Title</rdf:li></rdf:Alt></dc:title>";
+        let xmp_stream = Stream::new(
+            dictionary! { "Type" => "Metadata", "Subtype" => "XML" },
+            xmp_content.to_vec(),
+        );
+        let xmp_id = doc.add_object(xmp_stream);
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+            "Metadata" => xmp_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+
+        let metadata = get_pdf_metadata(file.path().to_str().unwrap().to_string()).unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("Info Title"));
     }
 
     // -- PdfValidation serialization tests --
