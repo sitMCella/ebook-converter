@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { formatFileSize } from '../../lib/format';
 
 function MetadataRow({ label, value }) {
@@ -13,7 +15,16 @@ function MetadataRow({ label, value }) {
   );
 }
 
+function buildSummary(meta, fileSize) {
+  const parts = [];
+  if (meta?.title) parts.push(meta.title);
+  if (meta?.pageCount) parts.push(`${meta.pageCount} pages`);
+  if (fileSize > 0) parts.push(formatFileSize(fileSize));
+  return parts.join(' · ');
+}
+
 export function MetadataSection({ file }) {
+  const [expanded, setExpanded] = useState(false);
   const meta = file.metadata;
   const fileSize = meta?.fileSize ?? file.size;
 
@@ -29,30 +40,37 @@ export function MetadataSection({ file }) {
   ];
 
   const visibleRows = rows.filter((r) => r.value != null && r.value !== '');
-
-  if (visibleRows.length === 0) {
-    return (
-      <div>
-        <h4 className="text-[14px] font-medium mb-3 pb-2 border-b border-[var(--border)]">
-          Metadata
-        </h4>
-        <p className="text-[12px] text-[var(--text-muted)]">
-          No metadata available.
-        </p>
-      </div>
-    );
-  }
+  const summary = buildSummary(meta, fileSize);
 
   return (
     <div>
-      <h4 className="text-[14px] font-medium mb-3 pb-2 border-b border-[var(--border)]">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 w-full text-left text-[14px] font-medium py-2 cursor-pointer bg-transparent border-none text-[var(--text-primary)]"
+      >
+        {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         Metadata
-      </h4>
-      <div className="flex flex-col gap-3">
-        {visibleRows.map((row) => (
-          <MetadataRow key={row.label} label={row.label} value={row.value} />
-        ))}
-      </div>
+        {!expanded && summary && (
+          <span className="text-[12px] font-normal text-[var(--text-muted)] ml-1 truncate">
+            · {summary}
+          </span>
+        )}
+      </button>
+
+      {expanded && (
+        <div className="pl-6 pb-2 flex flex-col gap-3">
+          {visibleRows.length === 0 ? (
+            <p className="text-[12px] text-[var(--text-muted)]">
+              No metadata available.
+            </p>
+          ) : (
+            visibleRows.map((row) => (
+              <MetadataRow key={row.label} label={row.label} value={row.value} />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }

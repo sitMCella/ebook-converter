@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { useEffect } from 'react';
@@ -7,7 +7,6 @@ import { SettingsScreen } from './SettingsScreen';
 import { SettingsProvider, useSettings } from '../../contexts/SettingsContext';
 import { ImportProvider, useImportContext } from '../../contexts/ImportContext';
 import { ConversionOptions } from '../library/ConversionOptions';
-import { DEFAULT_SETTINGS } from '../../lib/settings';
 
 vi.mock('../../lib/tauri', async (importOriginal) => ({
   ...(await importOriginal()),

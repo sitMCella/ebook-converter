@@ -140,10 +140,9 @@ describe('ConvertedScreen', () => {
     expect(screen.getByPlaceholderText('Search converted...')).toBeInTheDocument();
   });
 
-  it('auto-selects the first EPUB and shows its metadata', () => {
+  it('auto-selects the first EPUB and shows metadata summary', () => {
     renderConverted();
-    expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
-    expect(screen.getByText('47 extracted')).toBeInTheDocument();
+    expect(screen.getByText(/Design patterns\.pdf · 3\.1 MB · 47 images/)).toBeInTheDocument();
   });
 
   it('switches detail panel when a different EPUB is clicked', async () => {
@@ -153,8 +152,7 @@ describe('ConvertedScreen', () => {
     const listbox = screen.getByRole('listbox');
     await user.click(within(listbox).getByText('Pragmatic programmer.epub'));
 
-    expect(screen.getByText('Pragmatic programmer.pdf')).toBeInTheDocument();
-    expect(screen.getByText('12 extracted')).toBeInTheDocument();
+    expect(screen.getByText(/Pragmatic programmer\.pdf · 4\.0 MB · 12 images/)).toBeInTheDocument();
   });
 
   it('filters EPUB list by search query', async () => {
@@ -184,8 +182,10 @@ describe('ConvertedScreen', () => {
     expect(screen.getByText(/no cover image available/i)).toBeInTheDocument();
   });
 
-  it('shows metadata section with EPUB details', () => {
+  it('shows metadata section with EPUB details when expanded', async () => {
+    const user = userEvent.setup();
     renderConverted();
+    await user.click(screen.getByRole('button', { name: /metadata/i }));
     expect(screen.getByText('Source')).toBeInTheDocument();
     expect(screen.getByText('EPUB size')).toBeInTheDocument();
     expect(screen.getByText('Images')).toBeInTheDocument();
@@ -193,7 +193,8 @@ describe('ConvertedScreen', () => {
     expect(screen.getByText('Default')).toBeInTheDocument();
   });
 
-  it('shows settings override count when overrides exist', () => {
+  it('shows settings override count when overrides exist', async () => {
+    const user = userEvent.setup();
     const filesWithOverrides = [
       {
         ...convertedFiles[0],
@@ -204,10 +205,12 @@ describe('ConvertedScreen', () => {
       },
     ];
     renderConverted({ files: filesWithOverrides });
+    await user.click(screen.getByRole('button', { name: /metadata/i }));
     expect(screen.getByText('2 overrides')).toBeInTheDocument();
   });
 
-  it('hides metadata rows when values are zero', () => {
+  it('hides metadata rows when values are zero', async () => {
+    const user = userEvent.setup();
     const filesNoImages = [
       {
         ...convertedFiles[0],
@@ -218,6 +221,7 @@ describe('ConvertedScreen', () => {
       },
     ];
     renderConverted({ files: filesNoImages });
+    await user.click(screen.getByRole('button', { name: /metadata/i }));
     expect(screen.queryByText('Images')).not.toBeInTheDocument();
   });
 

@@ -5,7 +5,6 @@ import { getPdfCover, isTauri } from '../../lib/tauri';
 export function PagePreview({ file }) {
   const [coverImage, setCoverImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const pageCount = file.metadata?.pageCount ?? 0;
 
   const pdfPath = file.storedPdfPath;
 
@@ -45,11 +44,6 @@ export function PagePreview({ file }) {
           alt="Cover"
           className="max-h-[300px] rounded shadow-sm"
         />
-        {pageCount > 0 && (
-          <p className="text-[12px] text-[var(--text-muted)] mt-3">
-            {pageCount} {pageCount === 1 ? 'page' : 'pages'}
-          </p>
-        )}
       </div>
     );
   }
@@ -60,11 +54,6 @@ export function PagePreview({ file }) {
       <p className="text-[13px] text-[var(--text-muted)]">
         No cover image available
       </p>
-      {pageCount > 0 && (
-        <p className="text-[12px] text-[var(--text-muted)] mt-1">
-          {pageCount} {pageCount === 1 ? 'page' : 'pages'}
-        </p>
-      )}
     </div>
   );
 }

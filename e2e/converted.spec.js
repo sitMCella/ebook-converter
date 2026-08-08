@@ -153,7 +153,7 @@ test.describe('Converted Screen — EPUB Selection', () => {
   test('selected EPUB shows its details in the detail panel', async ({ page }) => {
     await page.getByRole('option').filter({ hasText: 'doc-two.epub' }).click();
     await expect(page.getByText('No cover image available')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /metadata/i })).toBeVisible();
   });
 });
 
@@ -229,27 +229,32 @@ test.describe('Converted Screen — Metadata', () => {
     await importConvertAndNavigate(page, 'metadata-test.pdf');
   });
 
-  test('shows metadata section heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
+  test('shows metadata section as collapsible button', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /metadata/i })).toBeVisible();
   });
 
-  test('shows source PDF file name', async ({ page }) => {
+  test('shows source PDF file name after expanding', async ({ page }) => {
+    await page.getByRole('button', { name: /metadata/i }).click();
     await expect(page.getByText('Source')).toBeVisible();
     await expect(page.getByText('metadata-test.pdf')).toBeVisible();
   });
 
-  test('shows EPUB file size', async ({ page }) => {
+  test('shows EPUB file size after expanding', async ({ page }) => {
+    const metadataBtn = page.getByRole('button', { name: /metadata/i });
+    await metadataBtn.click();
     await expect(page.getByText('EPUB size')).toBeVisible();
-    const metadataSection = page.getByRole('heading', { name: 'Metadata' }).locator('..');
+    const metadataSection = metadataBtn.locator('..');
     await expect(metadataSection.getByText('1.0 MB')).toBeVisible();
   });
 
-  test('shows extracted image count', async ({ page }) => {
+  test('shows extracted image count after expanding', async ({ page }) => {
+    await page.getByRole('button', { name: /metadata/i }).click();
     await expect(page.getByText('Images')).toBeVisible();
     await expect(page.getByText('5 extracted')).toBeVisible();
   });
 
-  test('shows settings used label', async ({ page }) => {
+  test('shows settings used label after expanding', async ({ page }) => {
+    await page.getByRole('button', { name: /metadata/i }).click();
     await expect(page.getByText('Settings used')).toBeVisible();
     await expect(page.getByText('Default')).toBeVisible();
   });

@@ -10,7 +10,6 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
 }));
 
 import { EpubDetailPanel } from './EpubDetailPanel';
-import { openFileWithSystem } from '../../lib/tauri';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -71,6 +70,6 @@ describe('EpubDetailPanel', () => {
 
   it('derives epub name from outputPath for the panel', () => {
     renderPanel();
-    expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
+    expect(screen.getByText(/Design patterns\.pdf/)).toBeInTheDocument();
   });
 });
