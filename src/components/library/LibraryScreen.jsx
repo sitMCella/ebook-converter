@@ -21,10 +21,14 @@ export function LibraryScreen() {
   );
 
   const filteredFiles = useMemo(
-    () =>
-      files.filter((f) =>
-        f.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
+    () => {
+      const q = searchQuery.toLowerCase();
+      return files.filter(
+        (f) =>
+          f.name.toLowerCase().includes(q) ||
+          (f.metadata?.title && f.metadata.title.toLowerCase().includes(q)),
+      );
+    },
     [files, searchQuery],
   );
 

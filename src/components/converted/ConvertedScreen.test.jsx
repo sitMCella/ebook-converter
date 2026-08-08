@@ -142,7 +142,7 @@ describe('ConvertedScreen', () => {
 
   it('auto-selects the first EPUB and shows metadata summary', () => {
     renderConverted();
-    expect(screen.getByText(/Design patterns\.pdf · 3\.1 MB · 47 images/)).toBeInTheDocument();
+    expect(screen.getByText(/Design Patterns · 384 pages/)).toBeInTheDocument();
   });
 
   it('switches detail panel when a different EPUB is clicked', async () => {
@@ -152,7 +152,7 @@ describe('ConvertedScreen', () => {
     const listbox = screen.getByRole('listbox');
     await user.click(within(listbox).getByText('Pragmatic programmer.epub'));
 
-    expect(screen.getByText(/Pragmatic programmer\.pdf · 4\.0 MB · 12 images/)).toBeInTheDocument();
+    expect(screen.getByText(/The Pragmatic Programmer · 352 pages/)).toBeInTheDocument();
   });
 
   it('filters EPUB list by search query', async () => {

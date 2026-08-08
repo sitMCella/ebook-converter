@@ -6,6 +6,11 @@ import { EpubMetadata } from './EpubMetadata';
 const baseFile = {
   path: '/docs/design-patterns.pdf',
   name: 'Design patterns.pdf',
+  metadata: {
+    title: 'Design Patterns',
+    pageCount: 384,
+    fileSize: 13003776,
+  },
   conversionResult: {
     outputPath: '/output/Design patterns.epub',
     images: 47,
@@ -24,9 +29,33 @@ describe('EpubMetadata', () => {
     expect(screen.getByRole('button', { name: /metadata/i })).toBeInTheDocument();
   });
 
-  it('shows summary with source name and size when collapsed', () => {
+  it('shows summary with book title and page count when collapsed', () => {
     render(<EpubMetadata file={baseFile} />);
-    expect(screen.getByText(/Design patterns\.pdf · 3\.1 MB · 47 images/)).toBeInTheDocument();
+    expect(screen.getByText(/Design Patterns · 384 pages/)).toBeInTheDocument();
+  });
+
+  it('does not show file size in collapsed summary', () => {
+    render(<EpubMetadata file={baseFile} />);
+    const summary = screen.getByText(/Design Patterns · 384 pages/);
+    expect(summary.textContent).not.toMatch(/MB/);
+  });
+
+  it('shows EPUB file name derived from outputPath when expanded', async () => {
+    render(<EpubMetadata file={baseFile} />);
+    await expand();
+    expect(screen.getByText('File name')).toBeInTheDocument();
+    expect(screen.getByText('Design patterns.epub')).toBeInTheDocument();
+  });
+
+  it('derives EPUB file name from pdf name when outputPath is missing', async () => {
+    const file = {
+      ...baseFile,
+      conversionResult: { ...baseFile.conversionResult, outputPath: undefined },
+    };
+    delete file.outputPath;
+    render(<EpubMetadata file={file} />);
+    await expand();
+    expect(screen.getByText('Design patterns.epub')).toBeInTheDocument();
   });
 
   it('shows source file name when expanded', async () => {
