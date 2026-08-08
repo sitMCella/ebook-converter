@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::Manager;
 use uuid::Uuid;
+
+use crate::conversion::image_extractor::extract_cover_image;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +65,21 @@ pub fn create_book_dir(app: &tauri::AppHandle) -> Result<(String, PathBuf), Stri
     Ok((book_id, book_dir))
 }
 
+fn save_cover_image(book_dir: &Path, pdf_path: &str) {
+    let cover = match extract_cover_image(pdf_path, "firstPage") {
+        Ok(Some(img)) => img,
+        _ => return,
+    };
+
+    let dynamic_img = match image::load_from_memory(&cover.data) {
+        Ok(img) => img,
+        Err(_) => return,
+    };
+
+    let cover_path = book_dir.join("cover.png");
+    let _ = dynamic_img.save_with_format(&cover_path, image::ImageFormat::Png);
+}
+
 pub fn copy_pdf_to_storage(
     app: &tauri::AppHandle,
     source_path: &str,
@@ -83,6 +100,8 @@ pub fn copy_pdf_to_storage(
         .to_str()
         .ok_or_else(|| "Invalid stored path".to_string())?
         .to_string();
+
+    save_cover_image(&book_dir, &stored_path);
 
     Ok(StoredBook {
         book_id,
@@ -205,6 +224,155 @@ pub fn list_books(app: tauri::AppHandle) -> Result<Vec<BookMetadata>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lopdf::{dictionary, Document, Object, Stream};
+
+    fn create_jpeg_data(width: u32, height: u32) -> Vec<u8> {
+        let img = image::RgbImage::from_pixel(width, height, image::Rgb([100, 150, 200]));
+        let dynamic = image::DynamicImage::ImageRgb8(img);
+        let mut buf = std::io::Cursor::new(Vec::new());
+        let encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, 50);
+        dynamic.write_with_encoder(encoder).unwrap();
+        buf.into_inner()
+    }
+
+    fn create_pdf_with_image(dir: &Path, filename: &str, width: u32, height: u32) -> PathBuf {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let jpeg_data = create_jpeg_data(width, height);
+        let img_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(width as i64),
+                "Height" => Object::Integer(height as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg_data,
+        );
+        let img_id = doc.add_object(Object::Stream(img_stream));
+
+        let xobjects = dictionary! { "Im0" => img_id };
+        let resources = dictionary! { "XObject" => xobjects };
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let path = dir.join(filename);
+        doc.save(&path).unwrap();
+        path
+    }
+
+    fn create_pdf_no_images(dir: &Path, filename: &str) -> PathBuf {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let path = dir.join(filename);
+        doc.save(&path).unwrap();
+        path
+    }
+
+    // -- save_cover_image tests --
+
+    #[test]
+    fn save_cover_image_creates_png_when_pdf_has_image() {
+        let dir = tempfile::tempdir().unwrap();
+        let book_dir = dir.path().join("book1");
+        std::fs::create_dir_all(&book_dir).unwrap();
+        let pdf_path = create_pdf_with_image(&book_dir, "source.pdf", 400, 500);
+
+        save_cover_image(&book_dir, pdf_path.to_str().unwrap());
+
+        let cover_path = book_dir.join("cover.png");
+        assert!(cover_path.exists());
+
+        let data = std::fs::read(&cover_path).unwrap();
+        assert!(data.starts_with(&[0x89, b'P', b'N', b'G']));
+    }
+
+    #[test]
+    fn save_cover_image_does_not_create_file_when_pdf_has_no_images() {
+        let dir = tempfile::tempdir().unwrap();
+        let book_dir = dir.path().join("book1");
+        std::fs::create_dir_all(&book_dir).unwrap();
+        let pdf_path = create_pdf_no_images(&book_dir, "source.pdf");
+
+        save_cover_image(&book_dir, pdf_path.to_str().unwrap());
+
+        let cover_path = book_dir.join("cover.png");
+        assert!(!cover_path.exists());
+    }
+
+    #[test]
+    fn save_cover_image_does_not_error_on_invalid_pdf() {
+        let dir = tempfile::tempdir().unwrap();
+        let book_dir = dir.path().join("book1");
+        std::fs::create_dir_all(&book_dir).unwrap();
+
+        save_cover_image(&book_dir, "/nonexistent/file.pdf");
+
+        let cover_path = book_dir.join("cover.png");
+        assert!(!cover_path.exists());
+    }
+
+    #[test]
+    fn save_cover_image_produces_valid_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let book_dir = dir.path().join("book1");
+        std::fs::create_dir_all(&book_dir).unwrap();
+        let pdf_path = create_pdf_with_image(&book_dir, "source.pdf", 300, 400);
+
+        save_cover_image(&book_dir, pdf_path.to_str().unwrap());
+
+        let cover_path = book_dir.join("cover.png");
+        let img = image::open(&cover_path).unwrap();
+        assert!(img.width() > 0);
+        assert!(img.height() > 0);
+    }
+
+    // -- existing tests --
 
     #[test]
     fn validate_book_id_accepts_valid_uuid() {

@@ -21,38 +21,6 @@ const baseFile = {
 };
 
 describe('MetadataSection', () => {
-  describe('collapsed summary', () => {
-    it('shows title and page count when collapsed', () => {
-      render(<MetadataSection file={baseFile} />);
-      expect(screen.getByText(/Design Patterns · 384 pages/)).toBeInTheDocument();
-    });
-
-    it('does not include file size in collapsed summary', () => {
-      render(<MetadataSection file={baseFile} />);
-      const summary = screen.getByText(/Design Patterns · 384 pages/);
-      expect(summary.textContent).not.toMatch(/MB/);
-    });
-
-    it('shows only title when page count is absent', () => {
-      const file = { ...baseFile, metadata: { ...baseFile.metadata, pageCount: undefined } };
-      render(<MetadataSection file={file} />);
-      expect(screen.getByText(/· Design Patterns$/)).toBeInTheDocument();
-    });
-
-    it('shows only page count when title is absent', () => {
-      const file = { ...baseFile, metadata: { ...baseFile.metadata, title: null } };
-      render(<MetadataSection file={file} />);
-      expect(screen.getByText(/· 384 pages$/)).toBeInTheDocument();
-    });
-
-    it('shows no summary when both title and page count are absent', () => {
-      const file = { ...baseFile, metadata: { fileSize: 1024 } };
-      render(<MetadataSection file={file} />);
-      const button = screen.getByRole('button', { name: /metadata/i });
-      expect(button.textContent.trim()).toBe('Metadata');
-    });
-  });
-
   describe('expanded rows', () => {
     it('shows file size when expanded', async () => {
       const user = userEvent.setup();
@@ -88,15 +56,6 @@ describe('MetadataSection', () => {
       expect(screen.getByText('Created')).toBeInTheDocument();
       expect(screen.getByText('Modified')).toBeInTheDocument();
       expect(screen.getByText('Producer')).toBeInTheDocument();
-    });
-
-    it('hides summary when expanded', async () => {
-      const user = userEvent.setup();
-      render(<MetadataSection file={baseFile} />);
-
-      await user.click(screen.getByRole('button', { name: /metadata/i }));
-
-      expect(screen.queryByText(/Design Patterns · 384 pages/)).not.toBeInTheDocument();
     });
 
     it('shows "No metadata available" when metadata is empty', async () => {

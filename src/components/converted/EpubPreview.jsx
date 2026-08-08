@@ -1,34 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Book, Loader } from 'lucide-react';
-import { readEpubPreview, isTauri } from '../../lib/tauri';
+import { getPdfCover, isTauri } from '../../lib/tauri';
 
 export function EpubPreview({ file }) {
   const [coverImage, setCoverImage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const outputPath = file.outputPath;
+  const pdfPath = file.storedPdfPath;
 
   useEffect(() => {
-    if (!outputPath || !isTauri) return;
+    if (!pdfPath || !isTauri) return;
 
     let cancelled = false;
     setLoading(true);
-    setError(null);
+    setCoverImage(null);
 
-    readEpubPreview(outputPath)
+    getPdfCover(pdfPath)
       .then((data) => {
         if (!cancelled) setCoverImage(data.coverImage);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err?.message || err?.toString() || 'Failed to load preview');
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [outputPath]);
+  }, [pdfPath]);
 
   if (loading) {
     return (
@@ -55,7 +52,7 @@ export function EpubPreview({ file }) {
     <div className="flex flex-col items-center justify-center py-10 rounded-[12px] bg-[var(--surface-2)] border border-[var(--border)]">
       <Book size={48} className="text-[var(--text-muted)] mb-3" />
       <p className="text-[13px] text-[var(--text-muted)]">
-        {error || 'No cover image available'}
+        No cover image available
       </p>
     </div>
   );
