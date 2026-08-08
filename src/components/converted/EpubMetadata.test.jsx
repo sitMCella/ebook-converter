@@ -29,17 +29,6 @@ describe('EpubMetadata', () => {
     expect(screen.getByRole('button', { name: /metadata/i })).toBeInTheDocument();
   });
 
-  it('shows summary with book title and page count when collapsed', () => {
-    render(<EpubMetadata file={baseFile} />);
-    expect(screen.getByText(/Design Patterns · 384 pages/)).toBeInTheDocument();
-  });
-
-  it('does not show file size in collapsed summary', () => {
-    render(<EpubMetadata file={baseFile} />);
-    const summary = screen.getByText(/Design Patterns · 384 pages/);
-    expect(summary.textContent).not.toMatch(/MB/);
-  });
-
   it('shows EPUB file name derived from outputPath when expanded', async () => {
     render(<EpubMetadata file={baseFile} />);
     await expand();

@@ -32,14 +32,6 @@ function getSettingsLabel(file) {
   return `${count} override${count !== 1 ? 's' : ''}`;
 }
 
-function buildSummary(file) {
-  const meta = file.metadata;
-  const parts = [];
-  if (meta?.title) parts.push(meta.title);
-  if (meta?.pageCount) parts.push(`${meta.pageCount} pages`);
-  return parts.join(' · ');
-}
-
 export function EpubMetadata({ file }) {
   const [expanded, setExpanded] = useState(false);
   const result = file.conversionResult;
@@ -60,7 +52,6 @@ export function EpubMetadata({ file }) {
   ];
 
   const visibleRows = rows.filter((r) => r.value != null && r.value !== '');
-  const summary = buildSummary(file);
 
   return (
     <div>
@@ -71,11 +62,6 @@ export function EpubMetadata({ file }) {
       >
         {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         Metadata
-        {!expanded && summary && (
-          <span className="text-[12px] font-normal text-[var(--text-muted)] ml-1 truncate">
-            · {summary}
-          </span>
-        )}
       </button>
 
       {expanded && (
