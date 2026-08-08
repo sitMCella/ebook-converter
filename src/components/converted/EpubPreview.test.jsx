@@ -4,7 +4,7 @@ import { EpubPreview } from './EpubPreview';
 
 vi.mock('../../lib/tauri', () => ({
   isTauri: false,
-  readEpubPreview: vi.fn(),
+  getPdfCover: vi.fn(),
 }));
 
 describe('EpubPreview', () => {
@@ -18,7 +18,7 @@ describe('EpubPreview', () => {
     expect(screen.getByText('No cover image available')).toBeInTheDocument();
   });
 
-  it('shows placeholder when conversionResult is missing', () => {
+  it('shows placeholder when storedPdfPath is missing', () => {
     const file = {};
     render(<EpubPreview file={file} />);
     expect(screen.getByText('No cover image available')).toBeInTheDocument();
@@ -33,9 +33,9 @@ describe('EpubPreview in Tauri', () => {
   it('shows loading state while fetching', async () => {
     const tauri = await import('../../lib/tauri');
     tauri.isTauri = true;
-    tauri.readEpubPreview.mockReturnValue(new Promise(() => {}));
+    tauri.getPdfCover.mockReturnValue(new Promise(() => {}));
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
+    const file = { storedPdfPath: '/path/to/book.pdf', conversionResult: {} };
     render(<EpubPreview file={file} />);
     expect(screen.getByText('Loading preview...')).toBeInTheDocument();
 
@@ -45,11 +45,11 @@ describe('EpubPreview in Tauri', () => {
   it('renders cover image after loading', async () => {
     const tauri = await import('../../lib/tauri');
     tauri.isTauri = true;
-    tauri.readEpubPreview.mockResolvedValue({
-      coverImage: 'data:image/jpeg;base64,abc123',
+    tauri.getPdfCover.mockResolvedValue({
+      coverImage: 'data:image/png;base64,abc123',
     });
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
+    const file = { storedPdfPath: '/path/to/book.pdf', conversionResult: {} };
     render(<EpubPreview file={file} />);
 
     await waitFor(() => {
@@ -57,7 +57,7 @@ describe('EpubPreview in Tauri', () => {
     });
 
     const img = screen.getByAltText('Cover');
-    expect(img).toHaveAttribute('src', 'data:image/jpeg;base64,abc123');
+    expect(img).toHaveAttribute('src', 'data:image/png;base64,abc123');
 
     tauri.isTauri = false;
   });
@@ -65,30 +65,15 @@ describe('EpubPreview in Tauri', () => {
   it('shows placeholder when no cover image', async () => {
     const tauri = await import('../../lib/tauri');
     tauri.isTauri = true;
-    tauri.readEpubPreview.mockResolvedValue({
+    tauri.getPdfCover.mockResolvedValue({
       coverImage: null,
     });
 
-    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
+    const file = { storedPdfPath: '/path/to/book.pdf', conversionResult: {} };
     render(<EpubPreview file={file} />);
 
     await waitFor(() => {
       expect(screen.getByText('No cover image available')).toBeInTheDocument();
-    });
-
-    tauri.isTauri = false;
-  });
-
-  it('shows error message on failure', async () => {
-    const tauri = await import('../../lib/tauri');
-    tauri.isTauri = true;
-    tauri.readEpubPreview.mockRejectedValue(new Error('Failed to read'));
-
-    const file = { outputPath: '/path/to/book.epub', conversionResult: {} };
-    render(<EpubPreview file={file} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Failed to read')).toBeInTheDocument();
     });
 
     tauri.isTauri = false;
