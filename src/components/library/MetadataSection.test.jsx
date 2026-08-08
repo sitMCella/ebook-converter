@@ -64,12 +64,23 @@ describe('MetadataSection', () => {
       expect(screen.getByText('12.4 MB')).toBeInTheDocument();
     });
 
+    it('shows PDF file name when expanded', async () => {
+      const user = userEvent.setup();
+      render(<MetadataSection file={baseFile} />);
+
+      await user.click(screen.getByRole('button', { name: /metadata/i }));
+
+      expect(screen.getByText('File name')).toBeInTheDocument();
+      expect(screen.getByText('Design patterns.pdf')).toBeInTheDocument();
+    });
+
     it('shows all metadata rows when expanded', async () => {
       const user = userEvent.setup();
       render(<MetadataSection file={baseFile} />);
 
       await user.click(screen.getByRole('button', { name: /metadata/i }));
 
+      expect(screen.getByText('File name')).toBeInTheDocument();
       expect(screen.getByText('Title')).toBeInTheDocument();
       expect(screen.getByText('Authors')).toBeInTheDocument();
       expect(screen.getByText('Pages')).toBeInTheDocument();

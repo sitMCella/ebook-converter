@@ -40,6 +40,24 @@ describe('EpubMetadata', () => {
     expect(summary.textContent).not.toMatch(/MB/);
   });
 
+  it('shows EPUB file name derived from outputPath when expanded', async () => {
+    render(<EpubMetadata file={baseFile} />);
+    await expand();
+    expect(screen.getByText('File name')).toBeInTheDocument();
+    expect(screen.getByText('Design patterns.epub')).toBeInTheDocument();
+  });
+
+  it('derives EPUB file name from pdf name when outputPath is missing', async () => {
+    const file = {
+      ...baseFile,
+      conversionResult: { ...baseFile.conversionResult, outputPath: undefined },
+    };
+    delete file.outputPath;
+    render(<EpubMetadata file={file} />);
+    await expand();
+    expect(screen.getByText('Design patterns.epub')).toBeInTheDocument();
+  });
+
   it('shows source file name when expanded', async () => {
     render(<EpubMetadata file={baseFile} />);
     await expand();
