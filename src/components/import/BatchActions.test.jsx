@@ -19,7 +19,7 @@ vi.mock('../../lib/tauri', async () => {
   };
 });
 
-import { importPdf, saveBookMetadata } from '../../lib/tauri';
+import { importPdf } from '../../lib/tauri';
 
 function Wrapper({ children }) {
   return (

@@ -10,7 +10,6 @@ vi.mock('../../lib/tauri', async (importOriginal) => ({
 }));
 
 import { EpubDetailPanel } from './EpubDetailPanel';
-import { openFileWithSystem } from '../../lib/tauri';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
