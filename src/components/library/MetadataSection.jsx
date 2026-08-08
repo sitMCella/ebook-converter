@@ -15,13 +15,6 @@ function MetadataRow({ label, value }) {
   );
 }
 
-function buildSummary(meta) {
-  const parts = [];
-  if (meta?.title) parts.push(meta.title);
-  if (meta?.pageCount) parts.push(`${meta.pageCount} pages`);
-  return parts.join(' · ');
-}
-
 export function MetadataSection({ file }) {
   const [expanded, setExpanded] = useState(false);
   const meta = file.metadata;
@@ -40,7 +33,6 @@ export function MetadataSection({ file }) {
   ];
 
   const visibleRows = rows.filter((r) => r.value != null && r.value !== '');
-  const summary = buildSummary(meta);
 
   return (
     <div>
@@ -51,11 +43,6 @@ export function MetadataSection({ file }) {
       >
         {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         Metadata
-        {!expanded && summary && (
-          <span className="text-[12px] font-normal text-[var(--text-muted)] ml-1 truncate">
-            · {summary}
-          </span>
-        )}
       </button>
 
       {expanded && (
