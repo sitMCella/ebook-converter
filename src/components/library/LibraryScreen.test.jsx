@@ -153,8 +153,17 @@ describe('LibraryScreen', () => {
     expect(screen.getByPlaceholderText('Search documents...')).toBeInTheDocument();
   });
 
-  it('auto-selects the first document and shows its metadata', async () => {
+  it('auto-selects the first document and shows metadata summary', async () => {
     await renderLibrary();
+    expect(screen.getByText(/Design Patterns · 384 pages/)).toBeInTheDocument();
+  });
+
+  it('expands metadata section to show all rows', async () => {
+    const user = userEvent.setup();
+    await renderLibrary();
+
+    await user.click(screen.getByRole('button', { name: /metadata/i }));
+
     expect(screen.getByText('Design Patterns')).toBeInTheDocument();
     expect(screen.getByText('Gamma, Helm, Johnson, Vlissides')).toBeInTheDocument();
     expect(screen.getByText('384')).toBeInTheDocument();
@@ -168,8 +177,7 @@ describe('LibraryScreen', () => {
     const secondItem = within(listbox).getByText('Clean architecture.pdf');
     await user.click(secondItem);
 
-    expect(screen.getByText('Clean Architecture')).toBeInTheDocument();
-    expect(screen.getByText('Robert C. Martin')).toBeInTheDocument();
+    expect(screen.getByText(/Clean Architecture · 432 pages/)).toBeInTheDocument();
   });
 
   it('filters document list by search query', async () => {
@@ -212,6 +220,7 @@ describe('LibraryScreen', () => {
   });
 
   it('hides metadata rows when values are absent', async () => {
+    const user = userEvent.setup();
     await renderLibrary({
       files: [
         {
@@ -223,6 +232,9 @@ describe('LibraryScreen', () => {
         },
       ],
     });
+
+    await user.click(screen.getByRole('button', { name: /metadata/i }));
+
     expect(screen.queryByText('Title')).not.toBeInTheDocument();
     expect(screen.queryByText('Authors')).not.toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
