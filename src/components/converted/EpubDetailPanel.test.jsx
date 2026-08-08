@@ -21,6 +21,11 @@ const baseFile = {
   path: '/docs/design-patterns.pdf',
   name: 'Design patterns.pdf',
   outputPath: '/output/Design patterns.epub',
+  metadata: {
+    title: 'Design Patterns',
+    pageCount: 384,
+    fileSize: 13003776,
+  },
   conversionResult: {
     outputPath: '/output/Design patterns.epub',
     images: 47,
@@ -68,8 +73,8 @@ describe('EpubDetailPanel', () => {
     });
   });
 
-  it('derives epub name from outputPath for the panel', () => {
+  it('shows book title and page count in collapsed metadata summary', () => {
     renderPanel();
-    expect(screen.getByText(/Design patterns\.pdf/)).toBeInTheDocument();
+    expect(screen.getByText(/Design Patterns · 384 pages/)).toBeInTheDocument();
   });
 });

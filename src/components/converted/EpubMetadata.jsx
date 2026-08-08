@@ -33,13 +33,10 @@ function getSettingsLabel(file) {
 }
 
 function buildSummary(file) {
-  const result = file.conversionResult;
+  const meta = file.metadata;
   const parts = [];
-  if (file.name) parts.push(file.name);
-  const epubSize = result?.fileSize ?? 0;
-  if (epubSize > 0) parts.push(formatFileSize(epubSize));
-  const images = result?.images ?? 0;
-  if (images > 0) parts.push(`${images} images`);
+  if (meta?.title) parts.push(meta.title);
+  if (meta?.pageCount) parts.push(`${meta.pageCount} pages`);
   return parts.join(' · ');
 }
 
