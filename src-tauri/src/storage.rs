@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::Manager;
 use uuid::Uuid;
+
+use crate::conversion::image_extractor::extract_cover_image;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +65,21 @@ pub fn create_book_dir(app: &tauri::AppHandle) -> Result<(String, PathBuf), Stri
     Ok((book_id, book_dir))
 }
 
+fn save_cover_image(book_dir: &Path, pdf_path: &str) {
+    let cover = match extract_cover_image(pdf_path, "firstPage") {
+        Ok(Some(img)) => img,
+        _ => return,
+    };
+
+    let dynamic_img = match image::load_from_memory(&cover.data) {
+        Ok(img) => img,
+        Err(_) => return,
+    };
+
+    let cover_path = book_dir.join("cover.png");
+    let _ = dynamic_img.save_with_format(&cover_path, image::ImageFormat::Png);
+}
+
 pub fn copy_pdf_to_storage(
     app: &tauri::AppHandle,
     source_path: &str,
@@ -83,6 +100,8 @@ pub fn copy_pdf_to_storage(
         .to_str()
         .ok_or_else(|| "Invalid stored path".to_string())?
         .to_string();
+
+    save_cover_image(&book_dir, &stored_path);
 
     Ok(StoredBook {
         book_id,

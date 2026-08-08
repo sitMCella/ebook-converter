@@ -67,6 +67,19 @@ pub fn validate_pdf(path: String) -> Result<PdfValidation, String> {
 
 #[tauri::command]
 pub fn get_pdf_cover(path: String) -> Result<PdfCoverData, String> {
+    if let Some(dir) = Path::new(&path).parent() {
+        let cached = dir.join("cover.png");
+        if cached.exists() {
+            let data = fs::read(&cached)
+                .map_err(|e| format!("Failed to read cached cover: {}", e))?;
+            use base64::Engine;
+            let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+            return Ok(PdfCoverData {
+                cover_image: Some(format!("data:image/png;base64,{}", b64)),
+            });
+        }
+    }
+
     let cover = extract_cover_image(&path, "firstPage")?;
 
     let cover_image = cover.map(|img| {
