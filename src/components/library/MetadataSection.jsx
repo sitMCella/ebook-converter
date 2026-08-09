@@ -45,6 +45,12 @@ export function MetadataSection({ file }) {
         Metadata
       </button>
 
+      {!expanded && meta?.title && (
+        <p className="pl-6 text-[13px] text-[var(--text-secondary)]">
+          {meta.title}{meta.pageCount ? ` · ${meta.pageCount} pages` : ''}
+        </p>
+      )}
+
       {expanded && (
         <div className="pl-6 pb-2 flex flex-col gap-3">
           {visibleRows.length === 0 ? (
