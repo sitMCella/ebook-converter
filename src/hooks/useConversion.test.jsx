@@ -500,6 +500,272 @@ describe('useConversion', () => {
     expect(result.current.importCtx.state.files.get('/b.pdf').status).toBe('converted');
   });
 
+  it('preserves completed files when scheduling during active conversion', async () => {
+    let resolveFirst, resolveSecond;
+    convertPdfToEpub
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }))
+      .mockResolvedValueOnce({ outputPath: '/out/c.epub' });
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+          { path: '/c.pdf', name: 'c.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    // Start A (blocks)
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    // Schedule B while A is running
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    // Resolve A — B starts (blocks)
+    await act(async () => {
+      resolveFirst({ outputPath: '/out/a.epub' });
+    });
+
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/a.pdf');
+
+    // Schedule C while B is running — completed list must still contain A
+    await act(async () => {
+      result.current.conversion.startConversion(['/c.pdf']);
+    });
+
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/a.pdf');
+    expect(result.current.conversionCtx.state.queue).toContain('/c.pdf');
+
+    // Resolve B — C starts and completes
+    await act(async () => {
+      resolveSecond({ outputPath: '/out/b.epub' });
+    });
+
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/a.pdf');
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/b.pdf');
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/c.pdf');
+    expect(result.current.conversionCtx.state.isComplete).toBe(true);
+  });
+
+  it('sets appended file statuses to converting', async () => {
+    let resolveFirst;
+    convertPdfToEpub
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({ outputPath: '/out/b.epub' });
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    const fileB = result.current.importCtx.state.files.get('/b.pdf');
+    expect(fileB.status).toBe('converting');
+
+    await act(async () => {
+      resolveFirst({ outputPath: '/out/a.epub' });
+    });
+  });
+
+  it('processes queued file after active file fails', async () => {
+    let rejectFirst;
+    convertPdfToEpub
+      .mockImplementationOnce(() => new Promise((_, reject) => { rejectFirst = reject; }))
+      .mockResolvedValueOnce({ outputPath: '/out/b.epub' });
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    await act(async () => {
+      rejectFirst(new Error('A failed'));
+    });
+
+    expect(result.current.importCtx.state.files.get('/a.pdf').status).toBe('error');
+    expect(result.current.importCtx.state.files.get('/b.pdf').status).toBe('converted');
+    expect(convertPdfToEpub).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancelAll resets appended files to ready', async () => {
+    let resolveFirst;
+    cancelConversion.mockResolvedValue(undefined);
+    convertPdfToEpub
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    await act(async () => {
+      await result.current.conversion.cancelAll();
+    });
+
+    expect(result.current.importCtx.state.files.get('/a.pdf').status).toBe('ready');
+    expect(result.current.importCtx.state.files.get('/b.pdf').status).toBe('ready');
+    expect(result.current.conversionCtx.state.activeFile).toBeNull();
+    expect(result.current.conversionCtx.state.queue).toEqual([]);
+  });
+
+  it('cancelAll stops processing queued files', async () => {
+    let resolveFirst;
+    cancelConversion.mockResolvedValue(undefined);
+    convertPdfToEpub
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({ outputPath: '/out/b.epub' });
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    await act(async () => {
+      await result.current.conversion.cancelAll();
+    });
+
+    // Resolve A after cancel — B should NOT be processed
+    await act(async () => {
+      resolveFirst({ outputPath: '/out/a.epub' });
+    });
+
+    expect(convertPdfToEpub).toHaveBeenCalledTimes(1);
+    expect(result.current.importCtx.state.files.get('/b.pdf').status).toBe('ready');
+  });
+
+  it('processes multiple files scheduled in separate calls', async () => {
+    convertPdfToEpub
+      .mockResolvedValueOnce({ outputPath: '/out/a.epub' })
+      .mockResolvedValueOnce({ outputPath: '/out/b.epub' })
+      .mockResolvedValueOnce({ outputPath: '/out/c.epub' });
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+          { path: '/c.pdf', name: 'c.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+      result.current.conversion.startConversion(['/b.pdf']);
+      result.current.conversion.startConversion(['/c.pdf']);
+    });
+
+    expect(convertPdfToEpub).toHaveBeenCalledTimes(3);
+    expect(result.current.importCtx.state.files.get('/a.pdf').status).toBe('converted');
+    expect(result.current.importCtx.state.files.get('/b.pdf').status).toBe('converted');
+    expect(result.current.importCtx.state.files.get('/c.pdf').status).toBe('converted');
+    expect(result.current.conversionCtx.state.isComplete).toBe(true);
+  });
+
+  it('new conversion after queue completes starts fresh', async () => {
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(result.current.conversionCtx.state.isComplete).toBe(true);
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/a.pdf');
+
+    // Start a new conversion — should use ENQUEUE_FILES, not APPEND_TO_QUEUE
+    convertPdfToEpub.mockResolvedValue({ outputPath: '/out/b.epub' });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    // ENQUEUE_FILES resets completedFiles
+    expect(result.current.conversionCtx.state.completedFiles).not.toContain('/a.pdf');
+    expect(result.current.conversionCtx.state.completedFiles).toContain('/b.pdf');
+    expect(result.current.conversionCtx.state.isComplete).toBe(true);
+  });
+
   it('reports isConverting based on activeFile', async () => {
     const { result } = await renderUseConversion();
 

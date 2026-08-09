@@ -292,6 +292,76 @@ describe('ConversionContext', () => {
     expect(getState().logEntries).toHaveLength(1);
   });
 
+  it('append to empty queue adds items', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf'] }));
+    expect(getState().queue).toEqual([]);
+
+    act(() => dispatch({ type: 'APPEND_TO_QUEUE', paths: ['/b.pdf'] }));
+    expect(getState().queue).toEqual(['/b.pdf']);
+    expect(getState().activeFile).toBe('/a.pdf');
+  });
+
+  it('start_next processes appended items', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf'] }));
+    act(() => dispatch({ type: 'APPEND_TO_QUEUE', paths: ['/b.pdf', '/c.pdf'] }));
+    act(() => dispatch({ type: 'COMPLETE_ACTIVE', path: '/a.pdf' }));
+    act(() => dispatch({ type: 'START_NEXT' }));
+
+    expect(getState().activeFile).toBe('/b.pdf');
+    expect(getState().queue).toEqual(['/c.pdf']);
+  });
+
+  it('cancel clears both original and appended queue items', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf', '/b.pdf'] }));
+    act(() => dispatch({ type: 'APPEND_TO_QUEUE', paths: ['/c.pdf'] }));
+    act(() => dispatch({ type: 'CANCEL_ALL' }));
+
+    expect(getState().activeFile).toBeNull();
+    expect(getState().queue).toEqual([]);
+  });
+
   it('returns state unchanged for unknown action', () => {
     let dispatch, getState;
     function Inner() {
