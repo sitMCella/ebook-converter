@@ -17,7 +17,6 @@ export function useConversion() {
   const { state: conversionState, dispatch: conversionDispatch } = useConversionContext();
   const { state: importState, dispatch: importDispatch } = useImportContext();
   const { settings: globalSettings } = useSettings();
-  const settingsRef = useRef(null);
 
   useEffect(() => {
     let unlisten;
@@ -54,9 +53,8 @@ export function useConversion() {
       importDispatch({ type: 'UPDATE_STATUS', path, status: 'converting' });
 
       try {
-        const baseSettings = settingsRef.current || globalSettings;
         const file = importState.files.get(path);
-        const settings = getEffectiveSettings(baseSettings, file?.overrides);
+        const settings = getEffectiveSettings(globalSettings, file?.overrides);
         const bookId = file?.bookId;
         const pdfPath = file?.storedPdfPath || path;
         const options = settingsToConversionOptions(settings, { bookId });
@@ -121,14 +119,16 @@ export function useConversion() {
     [importState.files, importDispatch, conversionDispatch, globalSettings],
   );
 
+  const convertFileRef = useRef(convertFile);
+  convertFileRef.current = convertFile;
+
   const processQueue = useCallback(
     async () => {
       isProcessing = true;
-      settingsRef.current = globalSettings;
 
       while (pendingQueue.length > 0 && isProcessing) {
         const path = pendingQueue.shift();
-        await convertFile(path);
+        await convertFileRef.current(path);
 
         if (isProcessing) {
           conversionDispatch({ type: 'START_NEXT' });
@@ -137,7 +137,7 @@ export function useConversion() {
 
       isProcessing = false;
     },
-    [convertFile, conversionDispatch, globalSettings],
+    [conversionDispatch],
   );
 
   const startConversion = useCallback(
