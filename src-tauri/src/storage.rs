@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tauri::Manager;
 use uuid::Uuid;
 
-use crate::conversion::image_extractor::extract_cover_image;
+use crate::conversion::image_extractor::{extract_cover_image, render_cover_page};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,6 +66,13 @@ pub fn create_book_dir(app: &tauri::AppHandle) -> Result<(String, PathBuf), Stri
 }
 
 fn save_cover_image(book_dir: &Path, pdf_path: &str) {
+    let cover_path = book_dir.join("cover.png");
+
+    if let Ok(Some(composited)) = render_cover_page(pdf_path) {
+        let _ = composited.save_with_format(&cover_path, image::ImageFormat::Png);
+        return;
+    }
+
     let cover = match extract_cover_image(pdf_path, "firstPage") {
         Ok(Some(img)) => img,
         _ => return,
@@ -76,7 +83,6 @@ fn save_cover_image(book_dir: &Path, pdf_path: &str) {
         Err(_) => return,
     };
 
-    let cover_path = book_dir.join("cover.png");
     let _ = dynamic_img.save_with_format(&cover_path, image::ImageFormat::Png);
 }
 
@@ -333,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn save_cover_image_does_not_create_file_when_pdf_has_no_images() {
+    fn save_cover_image_creates_file_for_pdf_without_images() {
         let dir = tempfile::tempdir().unwrap();
         let book_dir = dir.path().join("book1");
         std::fs::create_dir_all(&book_dir).unwrap();
@@ -342,7 +348,7 @@ mod tests {
         save_cover_image(&book_dir, pdf_path.to_str().unwrap());
 
         let cover_path = book_dir.join("cover.png");
-        assert!(!cover_path.exists());
+        assert!(cover_path.exists());
     }
 
     #[test]
