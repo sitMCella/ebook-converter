@@ -339,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn save_cover_image_does_not_create_file_when_pdf_has_no_images() {
+    fn save_cover_image_creates_file_for_pdf_without_images() {
         let dir = tempfile::tempdir().unwrap();
         let book_dir = dir.path().join("book1");
         std::fs::create_dir_all(&book_dir).unwrap();
@@ -348,7 +348,7 @@ mod tests {
         save_cover_image(&book_dir, pdf_path.to_str().unwrap());
 
         let cover_path = book_dir.join("cover.png");
-        assert!(!cover_path.exists());
+        assert!(cover_path.exists());
     }
 
     #[test]
