@@ -44,7 +44,7 @@ pub fn extract_cover_image(
     let cover_options = ImageOptions {
         extract_images: true,
         image_quality: "high".to_string(),
-        max_image_width: 1600,
+        max_image_width: u32::MAX,
         convert_to_webp: false,
     };
 
@@ -341,13 +341,19 @@ fn process_image_data(
     counter: u32,
     options: &ImageOptions,
 ) -> Result<ExtractedImage, String> {
-    if width <= options.max_image_width && !options.convert_to_webp {
+    let (actual_w, actual_h) = if mime == "image/jpeg" {
+        jpeg_dimensions(&data).unwrap_or((width, height))
+    } else {
+        (width, height)
+    };
+
+    if actual_w <= options.max_image_width && !options.convert_to_webp {
         return Ok(ExtractedImage {
             id: format!("{}_{}", image_id, counter),
             data,
             mime_type: mime.to_string(),
-            width,
-            height,
+            width: actual_w,
+            height: actual_h,
         });
     }
 
@@ -430,6 +436,50 @@ fn decompress_stream(stream: &lopdf::Stream, filter: &str) -> Result<Vec<u8>, St
         "Cannot decompress stream with filter '{}' (lopdf failed and no manual fallback available)",
         filter
     ))
+}
+
+fn jpeg_dimensions(data: &[u8]) -> Option<(u32, u32)> {
+    if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
+        return None;
+    }
+    let mut i = 2;
+    while i + 1 < data.len() {
+        if data[i] != 0xFF {
+            return None;
+        }
+        while i + 1 < data.len() && data[i + 1] == 0xFF {
+            i += 1;
+        }
+        if i + 1 >= data.len() {
+            return None;
+        }
+        let marker = data[i + 1];
+        i += 2;
+
+        if marker == 0xD8 || marker == 0xD9 || (0xD0..=0xD7).contains(&marker) || marker == 0x01 {
+            continue;
+        }
+
+        if matches!(marker, 0xC0..=0xC3 | 0xC5..=0xC7 | 0xC9..=0xCB | 0xCD..=0xCF) {
+            if i + 7 <= data.len() {
+                let height = u16::from_be_bytes([data[i + 3], data[i + 4]]) as u32;
+                let width = u16::from_be_bytes([data[i + 5], data[i + 6]]) as u32;
+                return Some((width, height));
+            }
+            return None;
+        }
+
+        if i + 1 < data.len() {
+            let len = u16::from_be_bytes([data[i], data[i + 1]]) as usize;
+            if len < 2 {
+                return None;
+            }
+            i += len;
+        } else {
+            return None;
+        }
+    }
+    None
 }
 
 fn get_dict_int(dict: &lopdf::Dictionary, key: &[u8]) -> Option<i64> {
@@ -826,5 +876,164 @@ mod tests {
         let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
         let img = result.unwrap();
         assert!(!img.data.is_empty());
+    }
+
+    #[test]
+    fn cover_image_preserves_full_resolution_above_1600() {
+        let file = create_pdf_with_image(2400, 3200);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert_eq!(img.width, 2400);
+        assert_eq!(img.height, 3200);
+    }
+
+    #[test]
+    fn cover_uses_actual_jpeg_dimensions_not_dictionary() {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let jpeg_data = create_jpeg_data(800, 1000);
+        let img_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(400),
+                "Height" => Object::Integer(500),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg_data,
+        );
+        let img_id = doc.add_object(Object::Stream(img_stream));
+
+        let xobjects = dictionary! { "Im0" => img_id };
+        let resources = dictionary! { "XObject" => xobjects };
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert_eq!(img.width, 800);
+        assert_eq!(img.height, 1000);
+    }
+
+    #[test]
+    fn cover_selects_largest_by_actual_dimensions() {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        // Small JPEG with inflated dictionary dimensions
+        let small_jpeg = create_jpeg_data(100, 100);
+        let small_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(2000),
+                "Height" => Object::Integer(2000),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            small_jpeg,
+        );
+        let small_id = doc.add_object(Object::Stream(small_stream));
+
+        // Large JPEG with accurate dictionary dimensions
+        let large_jpeg = create_jpeg_data(600, 800);
+        let large_stream = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(600),
+                "Height" => Object::Integer(800),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            large_jpeg,
+        );
+        let large_id = doc.add_object(Object::Stream(large_stream));
+
+        let xobjects = dictionary! {
+            "Im0" => small_id,
+            "Im1" => large_id,
+        };
+        let resources = dictionary! { "XObject" => xobjects };
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+
+        let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        let img = result.unwrap();
+        assert_eq!(img.width, 600);
+        assert_eq!(img.height, 800);
+    }
+
+    // -- jpeg_dimensions tests --
+
+    #[test]
+    fn jpeg_dimensions_parses_valid_jpeg() {
+        let data = create_jpeg_data(640, 480);
+        let dims = jpeg_dimensions(&data);
+        assert_eq!(dims, Some((640, 480)));
+    }
+
+    #[test]
+    fn jpeg_dimensions_returns_none_for_non_jpeg() {
+        assert_eq!(jpeg_dimensions(&[0x89, b'P', b'N', b'G']), None);
+    }
+
+    #[test]
+    fn jpeg_dimensions_returns_none_for_empty() {
+        assert_eq!(jpeg_dimensions(&[]), None);
+    }
+
+    #[test]
+    fn jpeg_dimensions_returns_none_for_truncated() {
+        assert_eq!(jpeg_dimensions(&[0xFF, 0xD8, 0xFF]), None);
     }
 }
