@@ -156,4 +156,32 @@ describe('BatchActions', () => {
     await act(async () => {});
     expect(importPdf).toHaveBeenCalledWith('/a.pdf');
   });
+
+  it('shows progress bar during import', async () => {
+    let resolveImport;
+    importPdf.mockImplementation(() => new Promise((r) => { resolveImport = r; }));
+
+    const user = userEvent.setup();
+    render(
+      <Wrapper>
+        <SeedStagedState
+          files={[{ path: '/a.pdf', name: 'a.pdf', status: 'ready', metadata: { title: null, pageCount: 0, pdfVersion: '1.7' } }]}
+          selectedPaths={['/a.pdf']}
+        >
+          <BatchActions />
+        </SeedStagedState>
+      </Wrapper>
+    );
+    await act(async () => {});
+    await user.click(screen.getByText('Import to library').closest('button'));
+
+    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByText('0 / 1')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveImport({ bookId: 'uuid-test', storedPdfPath: '/stored/a.pdf' });
+    });
+
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+  });
 });

@@ -6,6 +6,7 @@ import { validatePdf, getPdfMetadata, getFileSize, importPdf, saveBookMetadata }
 export function useImport() {
   const { state, dispatch } = useImportContext();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [importProgress, setImportProgress] = useState(null);
 
   const stageFiles = useCallback(
     async (paths) => {
@@ -94,12 +95,19 @@ export function useImport() {
 
       setIsProcessing(true);
 
+      const total = paths.length;
+      let completed = 0;
       let successCount = 0;
+      setImportProgress({ completed: 0, total });
 
       await Promise.all(
         paths.map(async (path) => {
           const file = state.stagedFiles.get(path);
-          if (!file || file.status !== 'ready') return;
+          if (!file || file.status !== 'ready') {
+            completed++;
+            setImportProgress({ completed, total });
+            return;
+          }
 
           try {
             const stored = await importPdf(path);
@@ -137,15 +145,19 @@ export function useImport() {
               status: 'error',
               errorMessage: `Failed to import file: ${err.message || err}`,
             });
+          } finally {
+            completed++;
+            setImportProgress({ completed, total });
           }
         })
       );
 
       setIsProcessing(false);
+      setImportProgress(null);
       return successCount;
     },
     [state.stagedFiles, dispatch]
   );
 
-  return { stageFiles, importStagedFiles, isProcessing };
+  return { stageFiles, importStagedFiles, isProcessing, importProgress };
 }

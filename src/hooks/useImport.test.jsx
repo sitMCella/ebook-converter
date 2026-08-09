@@ -312,5 +312,56 @@ describe('useImport', () => {
       });
       expect(importPdf).not.toHaveBeenCalled();
     });
+
+    it('clears importProgress after import completes', async () => {
+      const { result } = renderUseImport();
+
+      await act(async () => {
+        await result.current.import.stageFiles(['/test.pdf']);
+      });
+
+      await act(async () => {
+        await result.current.import.importStagedFiles(['/test.pdf']);
+      });
+
+      expect(result.current.import.importProgress).toBeNull();
+    });
+
+    it('tracks importProgress with correct total', async () => {
+      let resolveFirst;
+      let resolveSecond;
+      importPdf
+        .mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }))
+        .mockImplementationOnce(() => new Promise((r) => { resolveSecond = r; }));
+
+      const { result } = renderUseImport();
+
+      await act(async () => {
+        await result.current.import.stageFiles(['/a.pdf', '/b.pdf']);
+      });
+
+      let importPromise;
+      act(() => {
+        importPromise = result.current.import.importStagedFiles(['/a.pdf', '/b.pdf']);
+      });
+
+      expect(result.current.import.importProgress).toEqual({ completed: 0, total: 2 });
+
+      await act(async () => {
+        resolveFirst({ bookId: 'id-a', storedPdfPath: '/stored/a.pdf' });
+      });
+
+      expect(result.current.import.importProgress).toEqual({ completed: 1, total: 2 });
+
+      await act(async () => {
+        resolveSecond({ bookId: 'id-b', storedPdfPath: '/stored/b.pdf' });
+      });
+
+      await act(async () => {
+        await importPromise;
+      });
+
+      expect(result.current.import.importProgress).toBeNull();
+    });
   });
 });
