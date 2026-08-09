@@ -22,7 +22,7 @@ vi.mock('../lib/settings', async () => {
   };
 });
 
-import { useConversion } from './useConversion';
+import { useConversion, _resetProcessingState } from './useConversion';
 import { convertPdfToEpub, cancelConversion, onConversionProgress } from '../lib/tauri';
 import { getEffectiveSettings, settingsToConversionOptions } from '../lib/settings';
 
@@ -54,6 +54,7 @@ describe('useConversion', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetProcessingState();
     progressCallback = null;
     onConversionProgress.mockImplementation((cb) => {
       progressCallback = cb;
