@@ -262,6 +262,36 @@ describe('ConversionContext', () => {
     expect(getState().isComplete).toBe(false);
   });
 
+  it('appends to queue without resetting state', () => {
+    let dispatch, getState;
+    function Inner() {
+      const ctx = useConversionContext();
+      dispatch = ctx.dispatch;
+      getState = () => ctx.state;
+      return null;
+    }
+
+    render(
+      <ConversionProvider>
+        <Inner />
+      </ConversionProvider>
+    );
+
+    act(() => dispatch({ type: 'ENQUEUE_FILES', paths: ['/a.pdf', '/b.pdf'] }));
+    act(() => dispatch({ type: 'COMPLETE_ACTIVE', path: '/a.pdf' }));
+    act(() => dispatch({
+      type: 'ADD_LOG_ENTRY',
+      entry: { timestamp: 1000, message: 'progress', level: 'info' },
+    }));
+
+    act(() => dispatch({ type: 'APPEND_TO_QUEUE', paths: ['/c.pdf', '/d.pdf'] }));
+
+    expect(getState().activeFile).toBe('/a.pdf');
+    expect(getState().queue).toEqual(['/b.pdf', '/c.pdf', '/d.pdf']);
+    expect(getState().completedFiles).toContain('/a.pdf');
+    expect(getState().logEntries).toHaveLength(1);
+  });
+
   it('returns state unchanged for unknown action', () => {
     let dispatch, getState;
     function Inner() {

@@ -460,6 +460,45 @@ describe('useConversion', () => {
     expect(convertPdfToEpub).toHaveBeenCalledWith('/a.pdf', { outputFolder: '/out' });
   });
 
+  it('appends to queue when conversion is already running', async () => {
+    let resolveFirst;
+    convertPdfToEpub
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockResolvedValueOnce({ outputPath: '/out/b.epub' });
+
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [
+          { path: '/a.pdf', name: 'a.pdf', status: 'ready' },
+          { path: '/b.pdf', name: 'b.pdf', status: 'ready' },
+        ],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    expect(result.current.conversionCtx.state.activeFile).toBe('/a.pdf');
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/b.pdf']);
+    });
+
+    expect(result.current.conversionCtx.state.queue).toContain('/b.pdf');
+    expect(result.current.conversionCtx.state.completedFiles).toEqual([]);
+
+    await act(async () => {
+      resolveFirst({ outputPath: '/out/a.epub' });
+    });
+
+    expect(convertPdfToEpub).toHaveBeenCalledTimes(2);
+    expect(result.current.importCtx.state.files.get('/b.pdf').status).toBe('converted');
+  });
+
   it('reports isConverting based on activeFile', async () => {
     const { result } = await renderUseConversion();
 

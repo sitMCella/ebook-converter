@@ -11,6 +11,7 @@ export function useConversion() {
   const { settings: globalSettings } = useSettings();
   const isConvertingRef = useRef(false);
   const settingsRef = useRef(null);
+  const queueRef = useRef([]);
 
   useEffect(() => {
     let unlisten;
@@ -115,12 +116,12 @@ export function useConversion() {
   );
 
   const processQueue = useCallback(
-    async (paths) => {
+    async () => {
       isConvertingRef.current = true;
       settingsRef.current = globalSettings;
 
-      for (const path of paths) {
-        if (!isConvertingRef.current) break;
+      while (queueRef.current.length > 0 && isConvertingRef.current) {
+        const path = queueRef.current.shift();
         await convertFile(path);
 
         if (isConvertingRef.current) {
@@ -130,26 +131,32 @@ export function useConversion() {
 
       isConvertingRef.current = false;
     },
-    [convertFile, conversionDispatch],
+    [convertFile, conversionDispatch, globalSettings],
   );
 
   const startConversion = useCallback(
     (paths) => {
       if (!paths || paths.length === 0) return;
 
-      conversionDispatch({ type: 'ENQUEUE_FILES', paths });
-
       for (const path of paths) {
         importDispatch({ type: 'UPDATE_STATUS', path, status: 'converting' });
       }
 
-      processQueue(paths);
+      if (isConvertingRef.current) {
+        queueRef.current.push(...paths);
+        conversionDispatch({ type: 'APPEND_TO_QUEUE', paths });
+      } else {
+        queueRef.current = [...paths];
+        conversionDispatch({ type: 'ENQUEUE_FILES', paths });
+        processQueue();
+      }
     },
     [conversionDispatch, importDispatch, processQueue],
   );
 
   const cancelAll = useCallback(async () => {
     isConvertingRef.current = false;
+    queueRef.current = [];
 
     if (conversionState.activeFile) {
       try {
