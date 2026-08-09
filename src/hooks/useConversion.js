@@ -5,12 +5,18 @@ import { useSettings } from '../contexts/SettingsContext';
 import { convertPdfToEpub, cancelConversion, onConversionProgress, saveBookMetadata } from '../lib/tauri';
 import { getEffectiveSettings, settingsToConversionOptions } from '../lib/settings';
 
+let isProcessing = false;
+const pendingQueue = [];
+
+export function _resetProcessingState() {
+  isProcessing = false;
+  pendingQueue.length = 0;
+}
+
 export function useConversion() {
   const { state: conversionState, dispatch: conversionDispatch } = useConversionContext();
   const { state: importState, dispatch: importDispatch } = useImportContext();
   const { settings: globalSettings } = useSettings();
-  const isConvertingRef = useRef(false);
-  const settingsRef = useRef(null);
 
   useEffect(() => {
     let unlisten;
@@ -47,9 +53,8 @@ export function useConversion() {
       importDispatch({ type: 'UPDATE_STATUS', path, status: 'converting' });
 
       try {
-        const baseSettings = settingsRef.current || globalSettings;
         const file = importState.files.get(path);
-        const settings = getEffectiveSettings(baseSettings, file?.overrides);
+        const settings = getEffectiveSettings(globalSettings, file?.overrides);
         const bookId = file?.bookId;
         const pdfPath = file?.storedPdfPath || path;
         const options = settingsToConversionOptions(settings, { bookId });
@@ -114,42 +119,51 @@ export function useConversion() {
     [importState.files, importDispatch, conversionDispatch, globalSettings],
   );
 
+  const convertFileRef = useRef(convertFile);
+  convertFileRef.current = convertFile;
+
   const processQueue = useCallback(
-    async (paths) => {
-      isConvertingRef.current = true;
-      settingsRef.current = globalSettings;
+    async () => {
+      isProcessing = true;
 
-      for (const path of paths) {
-        if (!isConvertingRef.current) break;
-        await convertFile(path);
+      while (pendingQueue.length > 0 && isProcessing) {
+        const path = pendingQueue.shift();
+        await convertFileRef.current(path);
 
-        if (isConvertingRef.current) {
+        if (isProcessing) {
           conversionDispatch({ type: 'START_NEXT' });
         }
       }
 
-      isConvertingRef.current = false;
+      isProcessing = false;
     },
-    [convertFile, conversionDispatch],
+    [conversionDispatch],
   );
 
   const startConversion = useCallback(
     (paths) => {
       if (!paths || paths.length === 0) return;
 
-      conversionDispatch({ type: 'ENQUEUE_FILES', paths });
-
       for (const path of paths) {
         importDispatch({ type: 'UPDATE_STATUS', path, status: 'converting' });
       }
 
-      processQueue(paths);
+      if (isProcessing) {
+        pendingQueue.push(...paths);
+        conversionDispatch({ type: 'APPEND_TO_QUEUE', paths });
+      } else {
+        pendingQueue.length = 0;
+        pendingQueue.push(...paths);
+        conversionDispatch({ type: 'ENQUEUE_FILES', paths });
+        processQueue();
+      }
     },
     [conversionDispatch, importDispatch, processQueue],
   );
 
   const cancelAll = useCallback(async () => {
-    isConvertingRef.current = false;
+    isProcessing = false;
+    pendingQueue.length = 0;
 
     if (conversionState.activeFile) {
       try {

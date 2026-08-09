@@ -43,6 +43,12 @@ function conversionReducer(state, action) {
         completedFiles: [...state.completedFiles, action.path],
       };
     }
+    case 'APPEND_TO_QUEUE': {
+      return {
+        ...state,
+        queue: [...state.queue, ...action.paths],
+      };
+    }
     case 'CANCEL_ALL': {
       return {
         ...state,

@@ -64,6 +64,12 @@ export function EpubMetadata({ file }) {
         Metadata
       </button>
 
+      {!expanded && file.metadata?.title && (
+        <p className="pl-6 text-[13px] text-[var(--text-secondary)]">
+          {file.metadata.title}{file.metadata.pageCount ? ` · ${file.metadata.pageCount} pages` : ''}
+        </p>
+      )}
+
       {expanded && (
         <div className="pl-6 pb-2 flex flex-col gap-3">
           {visibleRows.length === 0 ? (
