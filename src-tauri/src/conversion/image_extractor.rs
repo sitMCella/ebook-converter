@@ -154,6 +154,276 @@ pub fn extract_images(
     Ok(images)
 }
 
+pub fn render_cover_page(path: &str) -> Result<Option<image::DynamicImage>, String> {
+    let doc = Document::load(path)
+        .map_err(|e| format!("Failed to load PDF for cover rendering: {}", e))?;
+
+    let pages = doc.get_pages();
+    let first_page_id = match pages.get(&1) {
+        Some(id) => *id,
+        None => return Ok(None),
+    };
+
+    let page = doc
+        .get_object(first_page_id)
+        .map_err(|e| format!("Failed to get page: {}", e))?;
+    let page_dict = page
+        .as_dict()
+        .map_err(|e| format!("Page is not a dictionary: {}", e))?;
+
+    let (x0, y0, x1, y1) = page_media_box(&doc, page_dict)?;
+    let page_w = x1 - x0;
+    let page_h = y1 - y0;
+    if page_w <= 0.0 || page_h <= 0.0 {
+        return Ok(None);
+    }
+
+    let content_bytes = match page_content_bytes(&doc, page_dict) {
+        Ok(b) => b,
+        Err(_) => return Ok(None),
+    };
+    let content = match lopdf::content::Content::decode(&content_bytes) {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+
+    let resources = match get_page_resources(&doc, first_page_id) {
+        Some(r) => r,
+        None => return Ok(None),
+    };
+    let xobjects = match get_xobjects(&doc, &resources) {
+        Some(x) => x,
+        None => return Ok(None),
+    };
+
+    let placements = find_image_placements(&content, &doc, &xobjects);
+    if placements.len() < 2 {
+        return Ok(None);
+    }
+
+    let cover_options = ImageOptions {
+        extract_images: true,
+        image_quality: "high".to_string(),
+        max_image_width: u32::MAX,
+        convert_to_webp: false,
+    };
+
+    let mut scale = 2.0_f64;
+    for (_, ctm, stream) in &placements {
+        let img_w = get_dict_int(&stream.dict, b"Width").unwrap_or(0) as f64;
+        let img_h = get_dict_int(&stream.dict, b"Height").unwrap_or(0) as f64;
+        let a = ctm[0].abs();
+        let d = ctm[3].abs();
+        if a > 0.0 && img_w > 0.0 {
+            scale = scale.max(img_w / a);
+        }
+        if d > 0.0 && img_h > 0.0 {
+            scale = scale.max(img_h / d);
+        }
+    }
+    scale = scale.min(4.0);
+
+    let canvas_w = (page_w * scale).round() as u32;
+    let canvas_h = (page_h * scale).round() as u32;
+    if canvas_w == 0 || canvas_h == 0 || canvas_w > 8000 || canvas_h > 12000 {
+        return Ok(None);
+    }
+
+    let mut canvas = image::RgbaImage::new(canvas_w, canvas_h);
+    for pixel in canvas.pixels_mut() {
+        *pixel = image::Rgba([255, 255, 255, 255]);
+    }
+
+    let mut painted = false;
+    let mut counter = 0u32;
+    for (name, ctm, stream) in &placements {
+        counter += 1;
+        let name_str = String::from_utf8_lossy(name).to_string();
+        let image_id = format!("comp_{}", name_str);
+
+        let extracted = match extract_single_image(stream, &image_id, counter, &cover_options) {
+            Ok(img) => img,
+            Err(_) => continue,
+        };
+
+        let src_img = match image::load_from_memory(&extracted.data) {
+            Ok(img) => img,
+            Err(_) => continue,
+        };
+
+        let [a, _b, _c, d, e, f] = *ctm;
+        let dest_w = (a.abs() * scale).round() as u32;
+        let dest_h = (d.abs() * scale).round() as u32;
+        if dest_w == 0 || dest_h == 0 {
+            continue;
+        }
+
+        let dest_x = ((e - x0) * scale).round() as i64;
+        let dest_y = ((page_h - (f - y0) - d.abs()) * scale).round() as i64;
+
+        let resized = src_img.resize_exact(
+            dest_w,
+            dest_h,
+            image::imageops::FilterType::Lanczos3,
+        );
+        image::imageops::overlay(&mut canvas, &resized.to_rgba8(), dest_x, dest_y);
+        painted = true;
+    }
+
+    if painted {
+        Ok(Some(image::DynamicImage::ImageRgba8(canvas)))
+    } else {
+        Ok(None)
+    }
+}
+
+fn page_media_box(
+    doc: &Document,
+    page_dict: &lopdf::Dictionary,
+) -> Result<(f64, f64, f64, f64), String> {
+    let mb = page_dict
+        .get(b"MediaBox")
+        .map_err(|_| "No MediaBox".to_string())?;
+    let resolved = match mb {
+        Object::Reference(r) => doc.get_object(*r).map_err(|e| format!("{}", e))?,
+        other => other,
+    };
+    let arr = resolved
+        .as_array()
+        .map_err(|_| "MediaBox not an array".to_string())?;
+    if arr.len() < 4 {
+        return Err("MediaBox has fewer than 4 elements".to_string());
+    }
+    let vals: Vec<f64> = arr
+        .iter()
+        .filter_map(|v| match v {
+            Object::Integer(i) => Some(*i as f64),
+            Object::Real(r) => Some(*r as f64),
+            _ => None,
+        })
+        .collect();
+    if vals.len() < 4 {
+        return Err("MediaBox values not numeric".to_string());
+    }
+    Ok((vals[0], vals[1], vals[2], vals[3]))
+}
+
+fn stream_bytes(stream: &lopdf::Stream) -> Vec<u8> {
+    stream
+        .decompressed_content()
+        .unwrap_or_else(|_| stream.content.clone())
+}
+
+fn page_content_bytes(
+    doc: &Document,
+    page_dict: &lopdf::Dictionary,
+) -> Result<Vec<u8>, String> {
+    let contents = page_dict
+        .get(b"Contents")
+        .map_err(|_| "No Contents".to_string())?;
+    match contents {
+        Object::Reference(r) => {
+            let obj = doc.get_object(*r).map_err(|e| format!("{}", e))?;
+            let stream = obj.as_stream().map_err(|e| format!("{}", e))?;
+            Ok(stream_bytes(stream))
+        }
+        Object::Array(arr) => {
+            let mut bytes = Vec::new();
+            for item in arr {
+                let r = match item {
+                    Object::Reference(r) => r,
+                    _ => continue,
+                };
+                if let Ok(obj) = doc.get_object(*r) {
+                    if let Ok(stream) = obj.as_stream() {
+                        bytes.extend_from_slice(&stream_bytes(stream));
+                        bytes.push(b' ');
+                    }
+                }
+            }
+            Ok(bytes)
+        }
+        _ => Err("Contents is neither Reference nor Array".to_string()),
+    }
+}
+
+fn find_image_placements<'a>(
+    content: &lopdf::content::Content,
+    doc: &'a Document,
+    xobjects: &'a lopdf::Dictionary,
+) -> Vec<(Vec<u8>, [f64; 6], &'a lopdf::Stream)> {
+    let mut ctm_stack: Vec<[f64; 6]> = Vec::new();
+    let mut ctm: [f64; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    let mut placements = Vec::new();
+
+    for op in &content.operations {
+        match op.operator.as_str() {
+            "q" => ctm_stack.push(ctm),
+            "Q" => {
+                if let Some(saved) = ctm_stack.pop() {
+                    ctm = saved;
+                }
+            }
+            "cm" => {
+                if let Some(m) = extract_ctm_operands(&op.operands) {
+                    ctm = concat_matrix(m, ctm);
+                }
+            }
+            "Do" => {
+                let name = match op.operands.first() {
+                    Some(Object::Name(n)) => n.clone(),
+                    _ => continue,
+                };
+                let xobj_ref = match xobjects.get(&name) {
+                    Ok(r) => r,
+                    Err(_) => continue,
+                };
+                let obj = match resolve_object(doc, xobj_ref) {
+                    Some(o) => o,
+                    None => continue,
+                };
+                if !is_image_xobject(doc, obj) {
+                    continue;
+                }
+                if let Ok(stream) = obj.as_stream() {
+                    placements.push((name, ctm, stream));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    placements
+}
+
+fn extract_ctm_operands(operands: &[Object]) -> Option<[f64; 6]> {
+    if operands.len() < 6 {
+        return None;
+    }
+    let mut m = [0.0_f64; 6];
+    for (i, op) in operands[..6].iter().enumerate() {
+        m[i] = match op {
+            Object::Integer(n) => *n as f64,
+            Object::Real(n) => *n as f64,
+            _ => return None,
+        };
+    }
+    Some(m)
+}
+
+fn concat_matrix(m1: [f64; 6], m2: [f64; 6]) -> [f64; 6] {
+    let [a1, b1, c1, d1, e1, f1] = m1;
+    let [a2, b2, c2, d2, e2, f2] = m2;
+    [
+        a1 * a2 + b1 * c2,
+        a1 * b2 + b1 * d2,
+        c1 * a2 + d1 * c2,
+        c1 * b2 + d1 * d2,
+        e1 * a2 + f1 * c2 + e2,
+        e1 * b2 + f1 * d2 + f2,
+    ]
+}
+
 fn get_page_resources(
     doc: &Document,
     page_id: lopdf::ObjectId,
@@ -1035,5 +1305,116 @@ mod tests {
     #[test]
     fn jpeg_dimensions_returns_none_for_truncated() {
         assert_eq!(jpeg_dimensions(&[0xFF, 0xD8, 0xFF]), None);
+    }
+
+    // -- render_cover_page tests --
+
+    fn create_tiled_pdf(
+        w1: u32, h1: u32,
+        w2: u32, h2: u32,
+    ) -> NamedTempFile {
+        let mut doc = Document::with_version("1.7");
+        let pages_id = doc.new_object_id();
+        let page_id = doc.new_object_id();
+
+        let jpeg1 = create_jpeg_data(w1, h1);
+        let img1 = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(w1 as i64),
+                "Height" => Object::Integer(h1 as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg1,
+        );
+        let img1_id = doc.add_object(Object::Stream(img1));
+
+        let jpeg2 = create_jpeg_data(w2, h2);
+        let img2 = Stream::new(
+            dictionary! {
+                "Type" => "XObject",
+                "Subtype" => "Image",
+                "Width" => Object::Integer(w2 as i64),
+                "Height" => Object::Integer(h2 as i64),
+                "ColorSpace" => "DeviceRGB",
+                "BitsPerComponent" => Object::Integer(8),
+                "Filter" => "DCTDecode",
+            },
+            jpeg2,
+        );
+        let img2_id = doc.add_object(Object::Stream(img2));
+
+        let xobjects = dictionary! {
+            "Im0" => img1_id,
+            "Im1" => img2_id,
+        };
+        let resources = dictionary! { "XObject" => xobjects };
+
+        // Content stream: two images tiled vertically (top half + bottom half)
+        let content_str = b"q 612 0 0 396 0 396 cm /Im0 Do Q q 612 0 0 396 0 0 cm /Im1 Do Q";
+        let content_stream = Stream::new(dictionary! {}, content_str.to_vec());
+        let content_id = doc.add_object(Object::Stream(content_stream));
+
+        let page = dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "MediaBox" => vec![0.into(), 0.into(), 612.into(), 792.into()],
+            "Resources" => resources,
+            "Contents" => content_id,
+        };
+        doc.objects.insert(page_id, Object::Dictionary(page));
+
+        let pages = dictionary! {
+            "Type" => "Pages",
+            "Kids" => vec![page_id.into()],
+            "Count" => Object::Integer(1),
+        };
+        doc.objects.insert(pages_id, Object::Dictionary(pages));
+
+        let root_id = doc.add_object(dictionary! {
+            "Type" => "Catalog",
+            "Pages" => pages_id,
+        });
+        doc.trailer.set("Root", root_id);
+
+        let file = NamedTempFile::new().unwrap();
+        doc.save(file.path()).unwrap();
+        file
+    }
+
+    #[test]
+    fn render_cover_composites_tiled_images() {
+        let file = create_tiled_pdf(400, 300, 400, 300);
+        let result = render_cover_page(file.path().to_str().unwrap()).unwrap();
+        assert!(result.is_some());
+        let img = result.unwrap();
+        assert!(img.width() > 0);
+        assert!(img.height() > 0);
+        // Canvas should have page aspect ratio (612:792 ≈ 0.77)
+        let ratio = img.width() as f64 / img.height() as f64;
+        assert!((ratio - 612.0 / 792.0).abs() < 0.05);
+    }
+
+    #[test]
+    fn render_cover_returns_none_for_single_image() {
+        let file = create_pdf_with_image(600, 800);
+        let result = render_cover_page(file.path().to_str().unwrap()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn render_cover_returns_none_for_no_images() {
+        let file = create_pdf_no_images();
+        let result = render_cover_page(file.path().to_str().unwrap()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn render_cover_returns_none_for_invalid_path() {
+        let result = render_cover_page("/nonexistent.pdf");
+        assert!(result.is_err());
     }
 }
