@@ -52,7 +52,7 @@ For other distributions, see the [Tauri prerequisites guide](https://v2.tauri.ap
 Clone the repository and install dependencies:
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:sitMCella/ebook-converter.git
 cd ebook-converter
 npm install
 ```
@@ -176,6 +176,32 @@ npm run tauri build -- --target universal-apple-darwin   # macOS universal binar
 npm run tauri build -- --bundles deb                     # Linux .deb only
 npm run tauri build -- --bundles msi                     # Windows .msi only
 ```
+
+### Creating a Release
+
+Releases are built automatically by GitHub Actions for Windows, macOS (ARM + Intel), and Linux when a version tag is pushed.
+
+1. Update `CHANGELOG.md` — move entries from `[Unreleased]` into a new version section:
+
+   ```markdown
+   ## [0.2.0] - 2026-09-01
+
+   ### Added
+   - New feature description.
+   ```
+
+2. Update the version in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` to match the new version.
+
+3. Commit and tag:
+
+   ```bash
+   git add CHANGELOG.md src-tauri/tauri.conf.json src-tauri/Cargo.toml
+   git commit -m "Release v0.2.0"
+   git tag v0.2.0
+   git push origin main --tags
+   ```
+
+4. The workflow builds platform-specific packages and creates a **draft GitHub Release** with the binaries attached. Review the draft on the [Releases page](../../releases) and publish it when ready.
 
 ## Available Scripts
 
