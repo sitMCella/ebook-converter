@@ -52,7 +52,7 @@ For other distributions, see the [Tauri prerequisites guide](https://v2.tauri.ap
 Clone the repository and install dependencies:
 
 ```bash
-git clone <repository-url>
+git clone git@github.com:sitMCella/ebook-converter.git
 cd ebook-converter
 npm install
 ```
