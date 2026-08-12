@@ -54,10 +54,20 @@ export function useConversion() {
 
       try {
         const file = importState.files.get(path);
+        const fileName = file?.name || path.split('/').pop();
         const settings = getEffectiveSettings(globalSettings, file?.overrides);
         const bookId = file?.bookId;
         const pdfPath = file?.storedPdfPath || path;
         const options = settingsToConversionOptions(settings, { bookId });
+
+        conversionDispatch({
+          type: 'ADD_LOG_ENTRY',
+          entry: {
+            timestamp: Date.now(),
+            message: `Converting ${fileName}...`,
+            level: 'info',
+          },
+        });
 
         const result = await convertPdfToEpub(pdfPath, options);
 
@@ -93,6 +103,16 @@ export function useConversion() {
             // metadata persistence is best-effort
           }
         }
+
+        const outputName = result.outputPath?.split('/').pop() || 'ebook';
+        conversionDispatch({
+          type: 'ADD_LOG_ENTRY',
+          entry: {
+            timestamp: Date.now(),
+            message: `Created ${outputName}`,
+            level: 'info',
+          },
+        });
 
         conversionDispatch({ type: 'COMPLETE_ACTIVE', path });
       } catch (error) {

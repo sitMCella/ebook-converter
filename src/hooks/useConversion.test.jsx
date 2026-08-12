@@ -766,6 +766,64 @@ describe('useConversion', () => {
     expect(result.current.conversionCtx.state.isComplete).toBe(true);
   });
 
+  it('logs PDF filename at start of conversion', async () => {
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    const entries = result.current.conversionCtx.state.logEntries;
+    expect(entries[0].message).toBe('Converting a.pdf...');
+    expect(entries[0].level).toBe('info');
+  });
+
+  it('logs output ebook filename on successful conversion', async () => {
+    convertPdfToEpub.mockResolvedValue({ outputPath: '/out/result.epub' });
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/a.pdf', name: 'a.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/a.pdf']);
+    });
+
+    const entries = result.current.conversionCtx.state.logEntries;
+    const lastEntry = entries[entries.length - 1];
+    expect(lastEntry.message).toBe('Created result.epub');
+    expect(lastEntry.level).toBe('info');
+  });
+
+  it('uses path basename as fallback when file has no name', async () => {
+    const { result } = await renderUseConversion();
+
+    await act(async () => {
+      result.current.importCtx.dispatch({
+        type: 'ADD_FILES',
+        files: [{ path: '/docs/report.pdf', status: 'ready' }],
+      });
+    });
+
+    await act(async () => {
+      result.current.conversion.startConversion(['/docs/report.pdf']);
+    });
+
+    const entries = result.current.conversionCtx.state.logEntries;
+    expect(entries[0].message).toBe('Converting report.pdf...');
+  });
+
   it('reports isConverting based on activeFile', async () => {
     const { result } = await renderUseConversion();
 
