@@ -97,7 +97,7 @@ pub fn generate_epub(
             .map_err(|e| format!("Failed to add image {}: {}", image.id, e))?;
     }
 
-    let xhtml = content_to_xhtml(content);
+    let xhtml = content_to_xhtml(content, options.page_handling.keep_page_breaks);
     let epub_content = EpubContent::new("content.xhtml", xhtml.as_bytes())
         .title(title)
         .reftype(ReferenceType::Text);
@@ -121,7 +121,7 @@ pub fn generate_epub(
     })
 }
 
-fn content_to_xhtml(content: &[StructuredContent]) -> String {
+fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> String {
     let mut html = String::from(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -167,8 +167,14 @@ fn content_to_xhtml(content: &[StructuredContent]) -> String {
                 }
                 html.push_str(&format!("<li>{}</li>\n", escape_xml(text)));
             }
-            StructuredContent::BlankLine | StructuredContent::PageBreak => {
+            StructuredContent::BlankLine => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
+            }
+            StructuredContent::PageBreak => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                if keep_page_breaks {
+                    html.push_str("<hr class=\"page-break\" />\n");
+                }
             }
         }
     }
@@ -390,6 +396,58 @@ mod tests {
         opts.output.epub_version = "epub2".to_string();
         let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
         assert!(result.has_cover);
+        assert!(output.exists());
+    }
+
+    // -- keep_page_breaks --
+
+    #[test]
+    fn xhtml_omits_page_break_when_disabled() {
+        let content = vec![
+            StructuredContent::Paragraph { text: "Page one".to_string() },
+            StructuredContent::PageBreak,
+            StructuredContent::Paragraph { text: "Page two".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(!xhtml.contains("page-break"));
+    }
+
+    #[test]
+    fn xhtml_inserts_page_break_hr_when_enabled() {
+        let content = vec![
+            StructuredContent::Paragraph { text: "Page one".to_string() },
+            StructuredContent::PageBreak,
+            StructuredContent::Paragraph { text: "Page two".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, true);
+        assert!(xhtml.contains(r#"<hr class="page-break" />"#));
+    }
+
+    #[test]
+    fn xhtml_page_break_closes_list_before_hr() {
+        let content = vec![
+            StructuredContent::ListItem { text: "item".to_string(), ordered: false },
+            StructuredContent::PageBreak,
+            StructuredContent::Paragraph { text: "next page".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, true);
+        let ul_close = xhtml.find("</ul>").unwrap();
+        let hr_pos = xhtml.find(r#"<hr class="page-break" />"#).unwrap();
+        assert!(ul_close < hr_pos);
+    }
+
+    #[test]
+    fn generate_epub_respects_keep_page_breaks() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("breaks.epub");
+        let content = vec![
+            StructuredContent::Paragraph { text: "One".to_string() },
+            StructuredContent::PageBreak,
+            StructuredContent::Paragraph { text: "Two".to_string() },
+        ];
+        let mut opts = test_options();
+        opts.page_handling.keep_page_breaks = true;
+        generate_epub(&content, &[], None, &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
         assert!(output.exists());
     }
 

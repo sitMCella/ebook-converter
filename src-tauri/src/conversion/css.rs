@@ -74,6 +74,14 @@ li {{
 img {{
     max-width: 100%;
     height: auto;
+}}
+
+hr.page-break {{
+    page-break-before: always;
+    border: none;
+    margin: 0;
+    padding: 0;
+    height: 0;
 }}"#,
         font_family = font_family,
         font_size = options.base_font_size,
