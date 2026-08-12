@@ -2,6 +2,10 @@
 
 A desktop application for converting ebook files, built with React and wrapped in Tauri for native cross-platform distribution.
 
+## Documentation
+
+For detailed guides and usage information, see the [GitHub Wiki](https://github.com/sitMCella/ebook-converter/wiki).
+
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture documentation, including frontend and backend details, project structure, security model, CI/CD, code signing, and custom app icons.
@@ -216,10 +220,6 @@ Releases are built automatically by GitHub Actions for Windows, macOS (ARM + Int
 | `npm run lint` | Run Oxlint |
 | `npm run tauri dev` | Start Tauri + Vite in development mode |
 | `npm run tauri build` | Build the desktop app for the current platform |
-
-## Documentation
-
-For detailed guides and usage information, see the [GitHub Wiki](https://github.com/sitMCella/ebook-converter/wiki).
 
 ## License
 
