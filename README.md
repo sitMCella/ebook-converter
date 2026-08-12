@@ -217,6 +217,10 @@ Releases are built automatically by GitHub Actions for Windows, macOS (ARM + Int
 | `npm run tauri dev` | Start Tauri + Vite in development mode |
 | `npm run tauri build` | Build the desktop app for the current platform |
 
+## Documentation
+
+For detailed guides and usage information, see the [GitHub Wiki](https://github.com/sitMCella/ebook-converter/wiki).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
