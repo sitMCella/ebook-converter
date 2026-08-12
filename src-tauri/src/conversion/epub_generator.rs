@@ -167,6 +167,14 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                 }
                 html.push_str(&format!("<li>{}</li>\n", escape_xml(text)));
             }
+            StructuredContent::Image { resource_path, alt } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                html.push_str(&format!(
+                    "<div class=\"image\"><img src=\"{}\" alt=\"{}\" /></div>\n",
+                    escape_xml(resource_path),
+                    escape_xml(alt)
+                ));
+            }
             StructuredContent::BlankLine => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
             }

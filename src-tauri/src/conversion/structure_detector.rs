@@ -5,6 +5,7 @@ pub enum StructuredContent {
     Heading { level: u8, text: String },
     Paragraph { text: String },
     ListItem { text: String, ordered: bool },
+    Image { resource_path: String, alt: String },
     BlankLine,
     PageBreak,
 }

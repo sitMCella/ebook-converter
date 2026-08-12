@@ -71,6 +71,12 @@ li {{
     margin-bottom: 0.2em;
 }}
 
+div.image {{
+    text-align: center;
+    margin: 1em 0;
+    text-indent: 0;
+}}
+
 img {{
     max-width: 100%;
     height: auto;
