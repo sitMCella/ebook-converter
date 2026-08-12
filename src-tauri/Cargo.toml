@@ -31,7 +31,7 @@ pdf-extract = "0.7"
 epub-builder = "0.7"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 flate2 = "1"
-mupdf = "0.8"
+mupdf = { version = "0.8", default-features = false, features = ["base14-fonts"] }
 zip = "0.6"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
