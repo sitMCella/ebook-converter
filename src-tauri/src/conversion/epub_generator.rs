@@ -167,13 +167,22 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                 }
                 html.push_str(&format!("<li>{}</li>\n", escape_xml(text)));
             }
-            StructuredContent::Image { resource_path, alt } => {
+            StructuredContent::Image { resource_path, alt, display_width } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
-                html.push_str(&format!(
-                    "<div class=\"image\"><img src=\"{}\" alt=\"{}\" /></div>\n",
-                    escape_xml(resource_path),
-                    escape_xml(alt)
-                ));
+                if let Some(w) = display_width {
+                    html.push_str(&format!(
+                        "<div class=\"image\"><img src=\"{}\" alt=\"{}\" style=\"max-width:{}px\" /></div>\n",
+                        escape_xml(resource_path),
+                        escape_xml(alt),
+                        w
+                    ));
+                } else {
+                    html.push_str(&format!(
+                        "<div class=\"image\"><img src=\"{}\" alt=\"{}\" /></div>\n",
+                        escape_xml(resource_path),
+                        escape_xml(alt)
+                    ));
+                }
             }
             StructuredContent::BlankLine => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
@@ -288,6 +297,7 @@ mod tests {
             mime_type: mime.to_string(),
             width: 600,
             height: 800,
+            display_width: None,
         }
     }
 
@@ -386,6 +396,7 @@ mod tests {
             mime_type: "image/jpeg".to_string(),
             width: 200,
             height: 200,
+            display_width: None,
         }];
         let cover = make_cover("image/jpeg");
         let result = generate_epub(&content, &body_images, Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();

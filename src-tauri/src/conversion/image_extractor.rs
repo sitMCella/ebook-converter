@@ -8,6 +8,7 @@ pub struct ExtractedImage {
     pub mime_type: String,
     pub width: u32,
     pub height: u32,
+    pub display_width: Option<u32>,
 }
 
 pub fn extract_cover_image(
@@ -125,6 +126,11 @@ pub fn extract_images(
             }
         };
 
+        let page_width = page
+            .bounds()
+            .map(|b| b.x1 - b.x0)
+            .unwrap_or(612.0);
+
         let collector = std::rc::Rc::new(std::cell::RefCell::new(ImageCollector {
             images: Vec::new(),
         }));
@@ -140,11 +146,18 @@ pub fn extract_images(
         let page_num = page_idx + 1;
         let collected = collector.borrow();
 
-        for (img_idx, mupdf_img) in collected.images.iter().enumerate() {
+        for (img_idx, (mupdf_img, ctm)) in collected.images.iter().enumerate() {
             image_counter += 1;
             let image_id = format!("img_p{}_{}", page_num, img_idx);
 
-            match mupdf_image_to_extracted(mupdf_img, &image_id, image_counter, options) {
+            let rendered_w = (ctm.a * ctm.a + ctm.b * ctm.b).sqrt();
+            let display_width = if rendered_w > 0.0 && rendered_w < page_width * 0.9 {
+                Some(rendered_w as u32)
+            } else {
+                None
+            };
+
+            match mupdf_image_to_extracted(mupdf_img, &image_id, image_counter, display_width, options) {
                 Ok(img) => images.push(img),
                 Err(e) => {
                     log::warn!("Skipping image {} on page {}: {}", img_idx, page_num, e);
@@ -157,19 +170,19 @@ pub fn extract_images(
 }
 
 struct ImageCollector {
-    images: Vec<mupdf::Image>,
+    images: Vec<(mupdf::Image, mupdf::Matrix)>,
 }
 
 impl mupdf::device::NativeDevice for ImageCollector {
     fn fill_image(
         &mut self,
         img: &mupdf::Image,
-        _ctm: mupdf::Matrix,
+        ctm: mupdf::Matrix,
         _alpha: f32,
         _cp: mupdf::ColorParams,
     ) {
         if img.width() >= 10 && img.height() >= 10 {
-            self.images.push(img.clone());
+            self.images.push((img.clone(), ctm));
         }
     }
 }
@@ -178,6 +191,7 @@ fn mupdf_image_to_extracted(
     img: &mupdf::Image,
     image_id: &str,
     counter: u32,
+    display_width: Option<u32>,
     options: &ImageOptions,
 ) -> Result<ExtractedImage, String> {
     let pixmap = img
@@ -231,7 +245,9 @@ fn mupdf_image_to_extracted(
         return Err(format!("Unsupported channel count: {}", n));
     };
 
-    process_dynamic_image(dynamic_img, image_id, counter, options)
+    let mut result = process_dynamic_image(dynamic_img, image_id, counter, options)?;
+    result.display_width = display_width;
+    Ok(result)
 }
 
 pub fn render_cover_page(path: &str) -> Result<Option<image::DynamicImage>, String> {
@@ -491,6 +507,7 @@ fn process_image_data(
             mime_type: mime.to_string(),
             width: actual_w,
             height: actual_h,
+            display_width: None,
         });
     }
 
@@ -541,6 +558,7 @@ fn process_dynamic_image(
         mime_type: mime,
         width: w,
         height: h,
+        display_width: None,
     })
 }
 
