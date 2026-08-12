@@ -1,16 +1,28 @@
 use super::PageHandlingOptions;
+use mupdf::TextExtractOptions;
 
 pub fn extract_text(
     path: &str,
     options: &PageHandlingOptions,
 ) -> Result<Vec<String>, String> {
-    let text = pdf_extract::extract_text(path)
-        .map_err(|e| format!("Failed to extract text: {}", e))?;
+    let doc = mupdf::Document::open(path)
+        .map_err(|e| format!("Failed to open PDF: {}", e))?;
 
-    let mut pages: Vec<String> = text.split('\x0C').map(|s| s.to_string()).collect();
+    let page_count = doc
+        .page_count()
+        .map_err(|e| format!("Failed to get page count: {}", e))?;
 
-    if pages.last().map_or(false, |p| p.trim().is_empty()) {
-        pages.pop();
+    let extract_opts = TextExtractOptions::default();
+    let mut pages = Vec::with_capacity(page_count as usize);
+
+    for i in 0..page_count {
+        let page = doc
+            .load_page(i)
+            .map_err(|e| format!("Failed to load page {}: {}", i + 1, e))?;
+        let text = page
+            .text(extract_opts)
+            .map_err(|e| format!("Failed to extract text from page {}: {}", i + 1, e))?;
+        pages.push(text);
     }
 
     if options.page_range == "custom" {
