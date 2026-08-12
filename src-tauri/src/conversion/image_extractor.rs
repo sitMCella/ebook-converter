@@ -106,52 +106,132 @@ pub fn extract_images(
         return Ok(Vec::new());
     }
 
-    let doc = Document::load(path)
-        .map_err(|e| format!("Failed to load PDF for image extraction: {}", e))?;
+    let doc = mupdf::Document::open(path)
+        .map_err(|e| format!("Failed to open PDF for image extraction: {}", e))?;
+
+    let page_count = doc
+        .page_count()
+        .map_err(|e| format!("Failed to get page count: {}", e))?;
 
     let mut images = Vec::new();
     let mut image_counter = 0u32;
 
-    for (page_num, page_id) in doc.get_pages() {
-        let resources = match get_page_resources(&doc, page_id) {
-            Some(r) => r,
-            None => continue,
-        };
-
-        let xobjects = match get_xobjects(&doc, &resources) {
-            Some(x) => x,
-            None => continue,
-        };
-
-        for (name, obj_ref) in &xobjects {
-            let object = match resolve_object(&doc, obj_ref) {
-                Some(o) => o,
-                None => continue,
-            };
-
-            if !is_image_xobject(&doc, &object) {
+    for page_idx in 0..page_count {
+        let page = match doc.load_page(page_idx) {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("Skipping page {}: {}", page_idx + 1, e);
                 continue;
             }
+        };
 
-            let stream = match object.as_stream() {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
+        let collector = std::rc::Rc::new(std::cell::RefCell::new(ImageCollector {
+            images: Vec::new(),
+        }));
+        let device = mupdf::Device::from_native(collector.clone())
+            .map_err(|e| format!("Failed to create device: {}", e))?;
+        let identity = mupdf::Matrix::new(1.0, 0.0, 0.0, 1.0, 0.0, 0.0);
+        if let Err(e) = page.run(&device, &identity) {
+            log::warn!("Failed to run page {} through device: {}", page_idx + 1, e);
+            continue;
+        }
+        drop(device);
 
+        let page_num = page_idx + 1;
+        let collected = collector.borrow();
+
+        for (img_idx, mupdf_img) in collected.images.iter().enumerate() {
             image_counter += 1;
-            let name_str = String::from_utf8_lossy(name).to_string();
-            let image_id = format!("img_p{}_{}", page_num, name_str);
+            let image_id = format!("img_p{}_{}", page_num, img_idx);
 
-            match extract_single_image(stream, &image_id, image_counter, options) {
+            match mupdf_image_to_extracted(mupdf_img, &image_id, image_counter, options) {
                 Ok(img) => images.push(img),
                 Err(e) => {
-                    log::warn!("Skipping image {} on page {}: {}", name_str, page_num, e);
+                    log::warn!("Skipping image {} on page {}: {}", img_idx, page_num, e);
                 }
             }
         }
     }
 
     Ok(images)
+}
+
+struct ImageCollector {
+    images: Vec<mupdf::Image>,
+}
+
+impl mupdf::device::NativeDevice for ImageCollector {
+    fn fill_image(
+        &mut self,
+        img: &mupdf::Image,
+        _ctm: mupdf::Matrix,
+        _alpha: f32,
+        _cp: mupdf::ColorParams,
+    ) {
+        if img.width() >= 10 && img.height() >= 10 {
+            self.images.push(img.clone());
+        }
+    }
+}
+
+fn mupdf_image_to_extracted(
+    img: &mupdf::Image,
+    image_id: &str,
+    counter: u32,
+    options: &ImageOptions,
+) -> Result<ExtractedImage, String> {
+    let pixmap = img
+        .to_pixmap()
+        .map_err(|e| format!("Failed to convert image to pixmap: {}", e))?;
+
+    let width = pixmap.width();
+    let height = pixmap.height();
+    if width == 0 || height == 0 {
+        return Err("Image has zero dimensions".to_string());
+    }
+
+    let n = pixmap.n() as usize;
+    let samples = pixmap.samples();
+    let stride = pixmap.stride() as usize;
+    let row_bytes = width as usize * n;
+
+    let mut packed = Vec::with_capacity(row_bytes * height as usize);
+    for row in 0..height as usize {
+        let start = row * stride;
+        let end = start + row_bytes;
+        if end <= samples.len() {
+            packed.extend_from_slice(&samples[start..end]);
+        }
+    }
+
+    let dynamic_img = if n == 1 {
+        let gray = image::GrayImage::from_raw(width, height, packed)
+            .ok_or_else(|| "Failed to create grayscale image".to_string())?;
+        image::DynamicImage::ImageLuma8(gray)
+    } else if n == 3 {
+        let rgb = image::RgbImage::from_raw(width, height, packed)
+            .ok_or_else(|| "Failed to create RGB image".to_string())?;
+        image::DynamicImage::ImageRgb8(rgb)
+    } else if n == 4 {
+        let rgba = image::RgbaImage::from_raw(width, height, packed)
+            .ok_or_else(|| "Failed to create RGBA image".to_string())?;
+        image::DynamicImage::ImageRgba8(rgba)
+    } else if n == 2 {
+        let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
+        for chunk in packed.chunks(2) {
+            let gray = chunk[0];
+            rgb.push(gray);
+            rgb.push(gray);
+            rgb.push(gray);
+        }
+        let img = image::RgbImage::from_raw(width, height, rgb)
+            .ok_or_else(|| "Failed to create image from gray+alpha".to_string())?;
+        image::DynamicImage::ImageRgb8(img)
+    } else {
+        return Err(format!("Unsupported channel count: {}", n));
+    };
+
+    process_dynamic_image(dynamic_img, image_id, counter, options)
 }
 
 pub fn render_cover_page(path: &str) -> Result<Option<image::DynamicImage>, String> {
