@@ -19,10 +19,11 @@ export function useConversion() {
   const { settings: globalSettings } = useSettings();
 
   useEffect(() => {
+    let cancelled = false;
     let unlisten;
 
     const setup = async () => {
-      unlisten = await onConversionProgress((progress) => {
+      const fn = await onConversionProgress((progress) => {
         importDispatch({
           type: 'SET_CONVERSION_PROGRESS',
           path: progress.path,
@@ -39,11 +40,17 @@ export function useConversion() {
           },
         });
       });
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
     };
 
     setup();
 
     return () => {
+      cancelled = true;
       if (typeof unlisten === 'function') unlisten();
     };
   }, [importDispatch, conversionDispatch]);
