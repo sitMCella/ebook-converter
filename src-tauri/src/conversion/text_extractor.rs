@@ -113,6 +113,16 @@ fn is_page_number(line: &str) -> bool {
         return true;
     }
 
+    // Pipe-prefixed footers: "| v", "| 42", "| xii"
+    if let Some(rest) = line.strip_prefix('|') {
+        let rest = rest.trim();
+        if !rest.is_empty()
+            && (rest.chars().all(|c| c.is_ascii_digit()) || is_roman_numeral(rest))
+        {
+            return true;
+        }
+    }
+
     false
 }
 
@@ -346,6 +356,34 @@ mod tests {
     fn is_page_number_handles_large_numbers() {
         assert!(is_page_number("1234"));
         assert!(is_page_number("9999"));
+    }
+
+    #[test]
+    fn is_page_number_pipe_prefixed_roman() {
+        assert!(is_page_number("| v"));
+        assert!(is_page_number("| xii"));
+        assert!(is_page_number("| IV"));
+        assert!(is_page_number("|v"));
+    }
+
+    #[test]
+    fn is_page_number_pipe_prefixed_digits() {
+        assert!(is_page_number("| 42"));
+        assert!(is_page_number("|5"));
+    }
+
+    #[test]
+    fn is_page_number_pipe_rejects_text() {
+        assert!(!is_page_number("| See also"));
+        assert!(!is_page_number("| Chapter One"));
+        assert!(!is_page_number("|"));
+    }
+
+    #[test]
+    fn strip_removes_pipe_prefixed_footer() {
+        let mut pages = vec!["Table of Contents text.\n\n| v".to_string()];
+        strip_page_numbers(&mut pages);
+        assert_eq!(pages[0], "Table of Contents text.\n");
     }
 
     #[test]
