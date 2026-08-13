@@ -53,29 +53,36 @@ pub fn extract_text(
 
 fn strip_page_numbers(pages: &mut Vec<String>) {
     for page in pages.iter_mut() {
-        let lines: Vec<&str> = page.lines().collect();
-        if lines.is_empty() {
-            continue;
-        }
-
-        let first_non_empty = lines.iter().position(|l| !l.trim().is_empty());
-        let last_non_empty = lines.iter().rposition(|l| !l.trim().is_empty());
-
-        let mut remove_indices = Vec::new();
-
-        if let Some(idx) = first_non_empty {
-            if is_page_number(lines[idx].trim()) {
-                remove_indices.push(idx);
+        // Iterate until no more footer/header lines are removed from either end.
+        // This handles multi-line footers where removing the page number exposes
+        // a bare pipe (or other separator) on the adjacent line.
+        loop {
+            let lines: Vec<&str> = page.lines().collect();
+            if lines.is_empty() {
+                break;
             }
-        }
 
-        if let Some(idx) = last_non_empty {
-            if !remove_indices.contains(&idx) && is_page_number(lines[idx].trim()) {
-                remove_indices.push(idx);
+            let first_non_empty = lines.iter().position(|l| !l.trim().is_empty());
+            let last_non_empty = lines.iter().rposition(|l| !l.trim().is_empty());
+
+            let mut remove_indices = Vec::new();
+
+            if let Some(idx) = first_non_empty {
+                if is_page_number(lines[idx].trim()) {
+                    remove_indices.push(idx);
+                }
             }
-        }
 
-        if !remove_indices.is_empty() {
+            if let Some(idx) = last_non_empty {
+                if !remove_indices.contains(&idx) && is_page_number(lines[idx].trim()) {
+                    remove_indices.push(idx);
+                }
+            }
+
+            if remove_indices.is_empty() {
+                break;
+            }
+
             let new_lines: Vec<&str> = lines
                 .iter()
                 .enumerate()
@@ -407,6 +414,22 @@ mod tests {
         let mut pages = vec!["Chapter content.\n\nxviii | Introduction".to_string()];
         strip_page_numbers(&mut pages);
         assert_eq!(pages[0], "Chapter content.\n");
+    }
+
+    #[test]
+    fn strip_removes_two_line_footer_pipe_then_number() {
+        // Footer split across two lines: page number on last, pipe on second-to-last
+        let mut pages = vec!["Content here.\n|\nvi".to_string()];
+        strip_page_numbers(&mut pages);
+        assert_eq!(pages[0], "Content here.");
+    }
+
+    #[test]
+    fn strip_removes_two_line_footer_number_then_pipe() {
+        // Footer split: page number on first line, pipe on next
+        let mut pages = vec!["42\n|\nContent here.".to_string()];
+        strip_page_numbers(&mut pages);
+        assert_eq!(pages[0], "Content here.");
     }
 
     #[test]
