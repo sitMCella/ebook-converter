@@ -113,13 +113,17 @@ fn is_page_number(line: &str) -> bool {
         return true;
     }
 
-    // Pipe separator or pipe-prefixed footers: "|", "| v", "| 42", "| xii"
-    if let Some(rest) = line.strip_prefix('|') {
-        let rest = rest.trim();
-        if rest.is_empty()
-            || rest.chars().all(|c| c.is_ascii_digit())
-            || is_roman_numeral(rest)
-        {
+    // Pipe-separated footers: "|", "| v", "6 | Chapter 1", "xviii | Introduction"
+    // Any segment around a "|" that is a bare page number (digits or Roman numerals)
+    // identifies the whole line as a footer.
+    if line.contains('|') {
+        let is_page_num_segment = |s: &str| -> bool {
+            let s = s.trim();
+            s.is_empty()
+                || s.chars().all(|c| c.is_ascii_digit())
+                || is_roman_numeral(s)
+        };
+        if line.split('|').any(is_page_num_segment) {
             return true;
         }
     }
@@ -360,6 +364,11 @@ mod tests {
     }
 
     #[test]
+    fn is_page_number_pipe_standalone() {
+        assert!(is_page_number("|"));
+    }
+
+    #[test]
     fn is_page_number_pipe_prefixed_roman() {
         assert!(is_page_number("| v"));
         assert!(is_page_number("| xii"));
@@ -374,14 +383,16 @@ mod tests {
     }
 
     #[test]
-    fn is_page_number_pipe_standalone() {
-        assert!(is_page_number("|"));
+    fn is_page_number_pipe_num_then_title() {
+        assert!(is_page_number("6 | Chapter 1: Domain Modeling"));
+        assert!(is_page_number("xviii | Introduction"));
+        assert!(is_page_number("iv | Table of Contents"));
     }
 
     #[test]
-    fn is_page_number_pipe_rejects_text() {
-        assert!(!is_page_number("| See also"));
-        assert!(!is_page_number("| Chapter One"));
+    fn is_page_number_pipe_rejects_text_both_sides() {
+        assert!(!is_page_number("foo | bar"));
+        assert!(!is_page_number("See also | Further reading"));
     }
 
     #[test]
@@ -389,6 +400,13 @@ mod tests {
         let mut pages = vec!["Table of Contents text.\n\n| v".to_string()];
         strip_page_numbers(&mut pages);
         assert_eq!(pages[0], "Table of Contents text.\n");
+    }
+
+    #[test]
+    fn strip_removes_num_pipe_title_footer() {
+        let mut pages = vec!["Chapter content.\n\nxviii | Introduction".to_string()];
+        strip_page_numbers(&mut pages);
+        assert_eq!(pages[0], "Chapter content.\n");
     }
 
     #[test]
