@@ -113,11 +113,12 @@ fn is_page_number(line: &str) -> bool {
         return true;
     }
 
-    // Pipe-prefixed footers: "| v", "| 42", "| xii"
+    // Pipe separator or pipe-prefixed footers: "|", "| v", "| 42", "| xii"
     if let Some(rest) = line.strip_prefix('|') {
         let rest = rest.trim();
-        if !rest.is_empty()
-            && (rest.chars().all(|c| c.is_ascii_digit()) || is_roman_numeral(rest))
+        if rest.is_empty()
+            || rest.chars().all(|c| c.is_ascii_digit())
+            || is_roman_numeral(rest)
         {
             return true;
         }
@@ -373,10 +374,14 @@ mod tests {
     }
 
     #[test]
+    fn is_page_number_pipe_standalone() {
+        assert!(is_page_number("|"));
+    }
+
+    #[test]
     fn is_page_number_pipe_rejects_text() {
         assert!(!is_page_number("| See also"));
         assert!(!is_page_number("| Chapter One"));
-        assert!(!is_page_number("|"));
     }
 
     #[test]
