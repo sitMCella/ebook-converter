@@ -102,6 +102,7 @@ pub fn extract_cover_image(
 pub fn extract_images(
     path: &str,
     options: &ImageOptions,
+    on_progress: &dyn Fn(&str),
 ) -> Result<Vec<ExtractedImage>, String> {
     if !options.extract_images {
         return Ok(Vec::new());
@@ -118,6 +119,8 @@ pub fn extract_images(
     let mut image_counter = 0u32;
 
     for page_idx in 0..page_count {
+        on_progress(&format!("Scanning page {} / {}...", page_idx + 1, page_count));
+
         let page = match doc.load_page(page_idx) {
             Ok(p) => p,
             Err(e) => {
@@ -145,6 +148,14 @@ pub fn extract_images(
 
         let page_num = page_idx + 1;
         let collected = collector.borrow();
+
+        if !collected.images.is_empty() {
+            on_progress(&format!(
+                "Found {} image(s) on page {}",
+                collected.images.len(),
+                page_num
+            ));
+        }
 
         for (img_idx, (mupdf_img, ctm)) in collected.images.iter().enumerate() {
             image_counter += 1;

@@ -77,14 +77,18 @@ pub async fn run_conversion(
     emit_progress(app, &path_owned, "extracting_images", 50, "Extracting images...");
 
     let images = if options.images.extract_images {
-        match image_extractor::extract_images(path, &options.images) {
+        let app_ref = app;
+        let path_ref = path_owned.clone();
+        match image_extractor::extract_images(path, &options.images, &|msg| {
+            emit_progress(app_ref, &path_ref, "extracting_images", 60, msg);
+        }) {
             Ok(imgs) => {
                 emit_progress(
                     app,
                     &path_owned,
                     "extracting_images",
                     70,
-                    &format!("Extracted {} images", imgs.len()),
+                    &format!("Extracted {} image(s) total", imgs.len()),
                 );
                 imgs
             }
