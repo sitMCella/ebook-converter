@@ -167,6 +167,19 @@ pub fn extract_images(
         }
     }
 
+    use std::collections::HashMap;
+    use std::hash::{Hash, Hasher};
+    let fingerprint = |data: &[u8]| -> u64 {
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        data.hash(&mut h);
+        h.finish()
+    };
+    let mut data_counts: HashMap<u64, u32> = HashMap::new();
+    for img in &images {
+        *data_counts.entry(fingerprint(&img.data)).or_insert(0) += 1;
+    }
+    images.retain(|img| data_counts.get(&fingerprint(&img.data)).copied().unwrap_or(0) < 3);
+
     Ok(images)
 }
 
