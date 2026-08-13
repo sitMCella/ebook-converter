@@ -28,15 +28,8 @@ pub fn extract_cover_image(
         None => return Ok(None),
     };
 
-    let resources = match get_page_resources(&doc, first_page_id) {
-        Some(r) => r,
-        None => return Ok(None),
-    };
-
-    let xobjects = match get_xobjects(&doc, &resources) {
-        Some(x) => x,
-        None => return Ok(None),
-    };
+    let xobjects = get_page_resources(&doc, first_page_id)
+        .and_then(|resources| get_xobjects(&doc, &resources));
 
     let mut best_image: Option<ExtractedImage> = None;
     let mut best_area: u64 = 0;
@@ -49,7 +42,7 @@ pub fn extract_cover_image(
         convert_to_webp: false,
     };
 
-    for (name, obj_ref) in &xobjects {
+    for (name, obj_ref) in xobjects.iter().flatten() {
         let object = match resolve_object(&doc, obj_ref) {
             Some(o) => o,
             None => continue,
@@ -82,6 +75,15 @@ pub fn extract_cover_image(
         }
     }
 
+    // No usable image found via direct XObject scan, but the page does reference
+    // XObjects (e.g. cover art nested inside a Form XObject) — rasterize the
+    // whole page instead so the cover isn't dropped or left as disjoint
+    // fragments. Pages with no XObjects at all (plain text pages) are left alone.
+    let has_xobjects = xobjects.map(|d| d.iter().next().is_some()).unwrap_or(false);
+    if best_image.is_none() && has_xobjects {
+        best_image = render_cover_fallback(path, &cover_options);
+    }
+
     match cover_mode {
         "firstPage" => Ok(best_image),
         "auto" => {
@@ -96,6 +98,24 @@ pub fn extract_cover_image(
             }
         }
         _ => Ok(None),
+    }
+}
+
+fn render_cover_fallback(path: &str, options: &ImageOptions) -> Option<ExtractedImage> {
+    let rendered = match render_cover_page(path) {
+        Ok(img) => img,
+        Err(e) => {
+            log::warn!("Cover fallback render failed: {}", e);
+            return None;
+        }
+    }?;
+
+    match process_dynamic_image(rendered, "cover_rendered", 0, options) {
+        Ok(img) => Some(img),
+        Err(e) => {
+            log::warn!("Cover fallback encode failed: {}", e);
+            None
+        }
     }
 }
 
