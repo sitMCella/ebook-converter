@@ -151,9 +151,9 @@ pub fn extract_images(
             let image_id = format!("img_p{}_{}", page_num, img_idx);
 
             let rendered_w = (ctm.a * ctm.a + ctm.b * ctm.b).sqrt();
-            let pct = ((rendered_w / page_width) * 100.0).round() as u32;
-            let display_width_pct = if pct > 0 && pct < 90 {
-                Some(pct)
+            let pct_of_page = rendered_w / page_width;
+            let display_width_pct = if pct_of_page > 0.0 && pct_of_page < 0.15 {
+                Some(((pct_of_page * 100.0).round() as u32).max(1))
             } else {
                 None
             };
