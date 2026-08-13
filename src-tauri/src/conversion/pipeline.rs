@@ -225,7 +225,7 @@ fn insert_images_into_content(
                         structure_detector::StructuredContent::Image {
                             resource_path: format!("images/{}_{}.{}", img.id, img.width, ext),
                             alt: format!("Image from page {}", current_page),
-                            display_width: img.display_width,
+                            display_width_pct: img.display_width_pct,
                         }
                     })
                     .collect();
@@ -251,7 +251,7 @@ fn insert_images_into_content(
             content.push(structure_detector::StructuredContent::Image {
                 resource_path: format!("images/{}_{}.{}", img.id, img.width, ext),
                 alt: format!("Image from page {}", current_page),
-                display_width: img.display_width,
+                display_width_pct: img.display_width_pct,
             });
         }
     }

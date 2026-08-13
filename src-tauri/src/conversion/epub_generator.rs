@@ -167,14 +167,14 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                 }
                 html.push_str(&format!("<li>{}</li>\n", escape_xml(text)));
             }
-            StructuredContent::Image { resource_path, alt, display_width } => {
+            StructuredContent::Image { resource_path, alt, display_width_pct } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
-                if let Some(w) = display_width {
+                if let Some(pct) = display_width_pct {
                     html.push_str(&format!(
-                        "<div class=\"image\"><img src=\"{}\" alt=\"{}\" style=\"max-width:{}px\" /></div>\n",
+                        "<div class=\"image\"><img src=\"{}\" alt=\"{}\" style=\"max-width:{}%\" /></div>\n",
                         escape_xml(resource_path),
                         escape_xml(alt),
-                        w
+                        pct
                     ));
                 } else {
                     html.push_str(&format!(
@@ -297,7 +297,7 @@ mod tests {
             mime_type: mime.to_string(),
             width: 600,
             height: 800,
-            display_width: None,
+            display_width_pct: None,
         }
     }
 
@@ -396,7 +396,7 @@ mod tests {
             mime_type: "image/jpeg".to_string(),
             width: 200,
             height: 200,
-            display_width: None,
+            display_width_pct: None,
         }];
         let cover = make_cover("image/jpeg");
         let result = generate_epub(&content, &body_images, Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();

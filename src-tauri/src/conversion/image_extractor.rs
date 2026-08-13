@@ -8,7 +8,7 @@ pub struct ExtractedImage {
     pub mime_type: String,
     pub width: u32,
     pub height: u32,
-    pub display_width: Option<u32>,
+    pub display_width_pct: Option<u32>,
 }
 
 pub fn extract_cover_image(
@@ -151,13 +151,14 @@ pub fn extract_images(
             let image_id = format!("img_p{}_{}", page_num, img_idx);
 
             let rendered_w = (ctm.a * ctm.a + ctm.b * ctm.b).sqrt();
-            let display_width = if rendered_w > 0.0 && rendered_w < page_width * 0.9 {
-                Some(rendered_w as u32)
+            let pct = ((rendered_w / page_width) * 100.0).round() as u32;
+            let display_width_pct = if pct > 0 && pct < 90 {
+                Some(pct)
             } else {
                 None
             };
 
-            match mupdf_image_to_extracted(mupdf_img, &image_id, image_counter, display_width, options) {
+            match mupdf_image_to_extracted(mupdf_img, &image_id, image_counter, display_width_pct, options) {
                 Ok(img) => images.push(img),
                 Err(e) => {
                     log::warn!("Skipping image {} on page {}: {}", img_idx, page_num, e);
@@ -191,7 +192,7 @@ fn mupdf_image_to_extracted(
     img: &mupdf::Image,
     image_id: &str,
     counter: u32,
-    display_width: Option<u32>,
+    display_width_pct: Option<u32>,
     options: &ImageOptions,
 ) -> Result<ExtractedImage, String> {
     let pixmap = img
@@ -246,7 +247,7 @@ fn mupdf_image_to_extracted(
     };
 
     let mut result = process_dynamic_image(dynamic_img, image_id, counter, options)?;
-    result.display_width = display_width;
+    result.display_width_pct = display_width_pct;
     Ok(result)
 }
 
@@ -507,7 +508,7 @@ fn process_image_data(
             mime_type: mime.to_string(),
             width: actual_w,
             height: actual_h,
-            display_width: None,
+            display_width_pct: None,
         });
     }
 
@@ -558,7 +559,7 @@ fn process_dynamic_image(
         mime_type: mime,
         width: w,
         height: h,
-        display_width: None,
+        display_width_pct: None,
     })
 }
 
