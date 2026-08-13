@@ -1,6 +1,7 @@
 use super::css;
 use super::image_extractor::ExtractedImage;
-use super::structure_detector::StructuredContent;
+use super::structure_detector::{StructuredContent, superscript_to_digit};
+use std::collections::HashSet;
 use super::{ConversionOptions, ConversionResult};
 use crate::pdf::PdfMetadata;
 use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
@@ -131,19 +132,45 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
 "#,
     );
 
+    let footnote_numbers: HashSet<u32> = content
+        .iter()
+        .filter_map(|c| match c {
+            StructuredContent::Footnote { number, .. } => Some(*number),
+            _ => None,
+        })
+        .collect();
+    let footnote_count = content
+        .iter()
+        .filter(|c| matches!(c, StructuredContent::Footnote { .. }))
+        .count();
+    let link_refs = !footnote_numbers.is_empty() && footnote_numbers.len() == footnote_count;
+
     let mut in_ul = false;
     let mut in_ol = false;
+    let mut linked_refs: HashSet<u32> = HashSet::new();
 
     for item in content {
         match item {
             StructuredContent::Heading { level, text } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
                 let tag = format!("h{}", level.min(&6));
-                html.push_str(&format!("<{}>{}</{}>\n", tag, escape_xml(text), tag));
+                let escaped = escape_xml(text);
+                let text_out = if link_refs {
+                    linkify_footnote_refs(&escaped, &footnote_numbers, &mut linked_refs)
+                } else {
+                    escaped
+                };
+                html.push_str(&format!("<{}>{}</{}>\n", tag, text_out, tag));
             }
             StructuredContent::Paragraph { text } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
-                html.push_str(&format!("<p>{}</p>\n", escape_xml(text)));
+                let escaped = escape_xml(text);
+                let text_out = if link_refs {
+                    linkify_footnote_refs(&escaped, &footnote_numbers, &mut linked_refs)
+                } else {
+                    escaped
+                };
+                html.push_str(&format!("<p>{}</p>\n", text_out));
             }
             StructuredContent::ListItem { text, ordered } => {
                 if *ordered {
@@ -165,7 +192,13 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                         in_ul = true;
                     }
                 }
-                html.push_str(&format!("<li>{}</li>\n", escape_xml(text)));
+                let escaped = escape_xml(text);
+                let text_out = if link_refs {
+                    linkify_footnote_refs(&escaped, &footnote_numbers, &mut linked_refs)
+                } else {
+                    escaped
+                };
+                html.push_str(&format!("<li>{}</li>\n", text_out));
             }
             StructuredContent::Image { resource_path, alt, display_width_pct } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
@@ -184,6 +217,9 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                     ));
                 }
             }
+            StructuredContent::Footnote { .. } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+            }
             StructuredContent::BlankLine => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
             }
@@ -197,6 +233,36 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
     }
 
     close_lists(&mut html, &mut in_ul, &mut in_ol);
+
+    let footnotes: Vec<_> = content
+        .iter()
+        .filter_map(|c| match c {
+            StructuredContent::Footnote { number, text } => Some((*number, text.as_str())),
+            _ => None,
+        })
+        .collect();
+
+    if !footnotes.is_empty() {
+        html.push_str("<section class=\"footnotes\">\n");
+        html.push_str("<hr class=\"footnote-separator\" />\n");
+        html.push_str("<ol>\n");
+        for (num, text) in &footnotes {
+            let back_link = if linked_refs.contains(num) {
+                format!(" <a href=\"#fnref{}\">\u{21A9}</a>", num)
+            } else {
+                String::new()
+            };
+            html.push_str(&format!(
+                "<li id=\"fn{}\" value=\"{}\"><p>{}{}</p></li>\n",
+                num,
+                num,
+                escape_xml(text),
+                back_link
+            ));
+        }
+        html.push_str("</ol>\n");
+        html.push_str("</section>\n");
+    }
 
     html.push_str("</body>\n</html>");
     html
@@ -219,6 +285,51 @@ fn escape_xml(text: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+fn linkify_footnote_refs(
+    text: &str,
+    footnote_numbers: &HashSet<u32>,
+    linked_refs: &mut HashSet<u32>,
+) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+
+    while let Some(&c) = chars.peek() {
+        if superscript_to_digit(c).is_some() {
+            let mut num = 0u32;
+            let mut raw = String::new();
+            while let Some(&sc) = chars.peek() {
+                if let Some(d) = superscript_to_digit(sc) {
+                    num = num * 10 + d;
+                    raw.push(sc);
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+
+            if num > 0 && footnote_numbers.contains(&num) {
+                if linked_refs.insert(num) {
+                    result.push_str(&format!(
+                        "<a href=\"#fn{}\" id=\"fnref{}\"><sup>{}</sup></a>",
+                        num, num, num
+                    ));
+                } else {
+                    result.push_str(&format!(
+                        "<a href=\"#fn{}\"><sup>{}</sup></a>",
+                        num, num
+                    ));
+                }
+            } else {
+                result.push_str(&raw);
+            }
+        } else {
+            result.push(chars.next().unwrap());
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -480,5 +591,51 @@ mod tests {
         let cover = make_cover("image/jpeg");
         let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert_eq!(result.output_path, output.to_str().unwrap());
+    }
+
+    // -- footnotes --
+
+    #[test]
+    fn xhtml_renders_endnotes_section() {
+        let content = vec![
+            StructuredContent::Paragraph { text: "Body text.".to_string() },
+            StructuredContent::Footnote { number: 1, text: "A footnote.".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(xhtml.contains("<section class=\"footnotes\">"));
+        assert!(xhtml.contains("id=\"fn1\""));
+        assert!(xhtml.contains("A footnote."));
+    }
+
+    #[test]
+    fn xhtml_links_inline_superscript_refs() {
+        let content = vec![
+            StructuredContent::Paragraph { text: "Text\u{00B9} here.".to_string() },
+            StructuredContent::Footnote { number: 1, text: "The note.".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(xhtml.contains("href=\"#fn1\""));
+        assert!(xhtml.contains("id=\"fnref1\""));
+        assert!(xhtml.contains("<sup>1</sup>"));
+    }
+
+    #[test]
+    fn xhtml_footnote_back_links() {
+        let content = vec![
+            StructuredContent::Paragraph { text: "Ref\u{00B9} here.".to_string() },
+            StructuredContent::Footnote { number: 1, text: "Note text.".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(xhtml.contains("href=\"#fnref1\""));
+        assert!(xhtml.contains("\u{21A9}"));
+    }
+
+    #[test]
+    fn xhtml_no_footnotes_section_without_footnotes() {
+        let content = vec![
+            StructuredContent::Paragraph { text: "Just text.".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(!xhtml.contains("footnotes"));
     }
 }

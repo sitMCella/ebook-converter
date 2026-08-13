@@ -88,6 +88,37 @@ hr.page-break {{
     margin: 0;
     padding: 0;
     height: 0;
+}}
+
+section.footnotes {{
+    margin-top: 2em;
+}}
+
+hr.footnote-separator {{
+    border: none;
+    border-top: 1px solid #999;
+    width: 30%;
+    margin: 1.5em 0 0.5em 0;
+}}
+
+section.footnotes ol {{
+    padding-left: 1.5em;
+    font-size: 0.85em;
+}}
+
+section.footnotes li {{
+    margin-bottom: 0.3em;
+}}
+
+section.footnotes p {{
+    text-indent: 0;
+    margin: 0;
+}}
+
+sup {{
+    font-size: 0.75em;
+    line-height: 0;
+    vertical-align: super;
 }}"#,
         font_family = font_family,
         font_size = options.base_font_size,

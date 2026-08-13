@@ -24,7 +24,6 @@ pub struct ConversionOptions {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
 pub struct StructureOptions {
     pub detect_headings: bool,
     pub detect_footnotes: bool,
