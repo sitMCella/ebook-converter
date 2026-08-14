@@ -1,5 +1,15 @@
 use super::PageHandlingOptions;
-use mupdf::TextExtractOptions;
+use mupdf::text_page::TextBlockType;
+use mupdf::{TextCharFlags, TextPage, TextPageFlags};
+
+/// Wraps a detected code block in the extracted page text. Private-use-area code
+/// points, so they can never collide with real PDF text content.
+pub(crate) const CODE_BLOCK_START: char = '\u{E000}';
+pub(crate) const CODE_BLOCK_END: char = '\u{E001}';
+
+/// Prefixes a detected heading line, immediately followed by an ASCII digit
+/// ('1'-'6') for its level, e.g. "\u{E002}1Domain Modeling".
+pub(crate) const HEADING_MARK: char = '\u{E002}';
 
 pub fn extract_text(
     path: &str,
@@ -12,16 +22,38 @@ pub fn extract_text(
         .page_count()
         .map_err(|e| format!("Failed to get page count: {}", e))?;
 
-    let extract_opts = TextExtractOptions::default();
-    let mut pages = Vec::with_capacity(page_count as usize);
-
+    // Go through the structured text page (blocks/lines/chars, with bbox and
+    // font info per char) rather than the flattened `Page::text()` convenience
+    // call. Holding the `TextPage`s is the hook the code-block/heading-level/
+    // column-order fixes need — those require the per-line bounds and per-char
+    // font that the flattened string throws away. Collected up front (not
+    // streamed page-by-page) because heading-level detection needs a
+    // document-wide body-text size baseline before any page can be marked.
+    let mut text_pages = Vec::with_capacity(page_count as usize);
     for i in 0..page_count {
         let page = doc
             .load_page(i)
             .map_err(|e| format!("Failed to load page {}: {}", i + 1, e))?;
-        let text = page
-            .text(extract_opts)
+        // DEHYPHENATE marks a soft hyphen at end-of-line so MuPDF joins that line
+        // with the next when flattening to text, instead of leaving e.g.
+        // "Impera\u{2010} tive Shell" split across two lines.
+        let text_page = page
+            .to_text_page(TextPageFlags::DEHYPHENATE)
+            .map_err(|e| format!("Failed to build text page for page {}: {}", i + 1, e))?;
+        text_pages.push(text_page);
+    }
+
+    let body_size = compute_body_size(&text_pages);
+
+    let mut pages = Vec::with_capacity(text_pages.len());
+    for (i, text_page) in text_pages.iter().enumerate() {
+        let text = text_page
+            .to_text()
             .map_err(|e| format!("Failed to extract text from page {}: {}", i + 1, e))?;
+        let text = mark_code_blocks(&text, text_page);
+        let text = fix_split_words(&text, text_page);
+        let text = fix_wrapped_code_terms(&text, text_page);
+        let text = mark_headings(&text, text_page, body_size);
         pages.push(text);
     }
 
@@ -51,46 +83,356 @@ pub fn extract_text(
     Ok(pages)
 }
 
+/// Finds text blocks whose lines are entirely set in a monospaced font (the
+/// PDF's way of typesetting a code/terminal listing) and wraps each one in
+/// `CODE_BLOCK_START`/`CODE_BLOCK_END` sentinel lines within `text`, so
+/// `structure_detector` can render it as `<pre><code>` instead of flattening
+/// it into ordinary prose paragraphs.
+fn mark_code_blocks(text: &str, text_page: &TextPage) -> String {
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    let mut cursor = 0usize;
+
+    for block in text_page.blocks() {
+        if block.r#type() != TextBlockType::Text {
+            continue;
+        }
+
+        let mut lines: Vec<String> = Vec::new();
+        let mut mono_lines = 0usize;
+        let mut text_lines = 0usize;
+
+        for line in block.lines() {
+            let mut line_text = String::new();
+            let mut is_mono: Option<bool> = None;
+            for ch in line.chars() {
+                if let Some(c) = ch.char() {
+                    line_text.push(c);
+                }
+                if is_mono.is_none() {
+                    if let Some(font) = ch.font() {
+                        is_mono = Some(font.is_monospaced());
+                    }
+                }
+            }
+            if !line_text.trim().is_empty() {
+                text_lines += 1;
+                if is_mono == Some(true) {
+                    mono_lines += 1;
+                }
+            }
+            lines.push(line_text);
+        }
+
+        // Require at least two non-blank lines, all set in a monospaced font,
+        // to treat the block as code rather than a single inline `code` word
+        // or a stray monospace caption sharing a line with regular prose.
+        if text_lines < 2 || mono_lines != text_lines {
+            continue;
+        }
+
+        let key = lines.join("\n");
+        if key.trim().is_empty() {
+            continue;
+        }
+
+        if let Some(rel_pos) = text[cursor..].find(&key) {
+            let start = cursor + rel_pos;
+            let end = start + key.len();
+            ranges.push((start, end));
+            cursor = end;
+        }
+    }
+
+    if ranges.is_empty() {
+        return text.to_string();
+    }
+
+    let mut out = String::with_capacity(text.len() + ranges.len() * 4);
+    let mut last = 0usize;
+    for (start, end) in ranges {
+        out.push_str(&text[last..start]);
+        out.push(CODE_BLOCK_START);
+        out.push('\n');
+        out.push_str(&text[start..end]);
+        out.push('\n');
+        out.push(CODE_BLOCK_END);
+        last = end;
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+/// Removes a MuPDF-inserted "synthetic" space (`TextCharFlags::SYNTHETIC`) when
+/// it sits between two monospaced word characters, e.g. "available_quan tity".
+/// MuPDF inserts these when it judges the gap between two glyphs large enough
+/// to be a real word break; monospaced/code fonts can trip that heuristic on
+/// ordinary kerning (often around an underscore), splitting one identifier
+/// into two. Real word breaks in prose almost always carry an actual space
+/// glyph rather than a synthetic one, so this only touches the narrow case
+/// MuPDF itself flagged as a guess, and only inside monospaced runs.
+fn fix_split_words(text: &str, text_page: &TextPage) -> String {
+    let mut cursor = 0usize;
+    let mut last_copied = 0usize;
+    let mut out = String::with_capacity(text.len());
+
+    for block in text_page.blocks() {
+        if block.r#type() != TextBlockType::Text {
+            continue;
+        }
+
+        for line in block.lines() {
+            let mut line_text = String::new();
+            // (char, is a synthetic space MuPDF guessed at, char's font is monospaced)
+            let mut chars: Vec<(char, bool, bool)> = Vec::new();
+
+            for ch in line.chars() {
+                let Some(c) = ch.char() else { continue };
+                let is_synthetic_space = c == ' ' && ch.flags().contains(TextCharFlags::SYNTHETIC);
+                let is_mono = ch.font().map(|f| f.is_monospaced()).unwrap_or(false);
+                line_text.push(c);
+                chars.push((c, is_synthetic_space, is_mono));
+            }
+
+            let mut needs_fix = false;
+            let mut fixed = String::with_capacity(line_text.len());
+            for (idx, &(c, is_synthetic_space, _)) in chars.iter().enumerate() {
+                if is_synthetic_space {
+                    let prev_is_mono_word = idx > 0 && chars[idx - 1].2 && is_word_char(chars[idx - 1].0);
+                    let next_is_mono_word =
+                        idx + 1 < chars.len() && chars[idx + 1].2 && is_word_char(chars[idx + 1].0);
+                    if prev_is_mono_word && next_is_mono_word {
+                        needs_fix = true;
+                        continue;
+                    }
+                }
+                fixed.push(c);
+            }
+
+            if !needs_fix {
+                continue;
+            }
+
+            if let Some(rel_pos) = text[cursor..].find(&line_text) {
+                let start = cursor + rel_pos;
+                let end = start + line_text.len();
+                out.push_str(&text[last_copied..start]);
+                out.push_str(&fixed);
+                last_copied = end;
+                cursor = end;
+            }
+        }
+    }
+
+    out.push_str(&text[last_copied..]);
+    out
+}
+
+fn is_word_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '_'
+}
+
+/// Joins a line-wrap that split a single inline monospaced term (e.g. a code
+/// identifier like `available_quantity` mentioned inline in prose) across two
+/// lines with neither a hyphen nor a space at the break — e.g.
+/// "...an integer available_quan" / "tity, and we decrement...". DEHYPHENATE
+/// (see `extract_text`) only rejoins breaks that end in a hyphen character;
+/// this covers breaks that have neither, which normal prose line-wraps never
+/// do (a real word boundary always leaves a hyphen or is itself the wrap
+/// point), so it's safe to gate purely on "both sides of the break are inside
+/// a monospaced word". Whole code blocks (all-monospace blocks, handled by
+/// `mark_code_blocks`) are skipped: there, adjacent lines are separate lines
+/// of code and must stay on separate lines.
+fn fix_wrapped_code_terms(text: &str, text_page: &TextPage) -> String {
+    let mut cursor = 0usize;
+    let mut last_copied = 0usize;
+    let mut out = String::with_capacity(text.len());
+
+    for block in text_page.blocks() {
+        if block.r#type() != TextBlockType::Text {
+            continue;
+        }
+
+        let mut lines: Vec<String> = Vec::new();
+        // (font of first char is monospace?, font of last char is monospace?, every char monospace?)
+        let mut line_info: Vec<(Option<bool>, Option<bool>, bool)> = Vec::new();
+        let mut mono_lines = 0usize;
+        let mut text_lines = 0usize;
+
+        for line in block.lines() {
+            let mut line_text = String::new();
+            let mut char_is_mono: Vec<bool> = Vec::new();
+            for ch in line.chars() {
+                if let Some(c) = ch.char() {
+                    let is_mono = ch.font().map(|f| f.is_monospaced()).unwrap_or(false);
+                    line_text.push(c);
+                    char_is_mono.push(is_mono);
+                }
+            }
+            let first_mono = char_is_mono.first().copied();
+            let last_mono = char_is_mono.last().copied();
+            let all_mono = !char_is_mono.is_empty() && char_is_mono.iter().all(|&m| m);
+            if !line_text.trim().is_empty() {
+                text_lines += 1;
+                if all_mono {
+                    mono_lines += 1;
+                }
+            }
+            lines.push(line_text);
+            line_info.push((first_mono, last_mono, all_mono));
+        }
+
+        // A whole-block code listing is mark_code_blocks's territory; its
+        // line breaks are real and must not be merged away.
+        if text_lines >= 2 && mono_lines == text_lines {
+            continue;
+        }
+
+        for i in 0..lines.len().saturating_sub(1) {
+            let (cur, next) = (&lines[i], &lines[i + 1]);
+            if cur.trim().is_empty() || next.trim().is_empty() {
+                continue;
+            }
+
+            let cur_ends_mono_word =
+                line_info[i].1 == Some(true) && cur.chars().last().is_some_and(is_word_char);
+            let next_starts_mono_word =
+                line_info[i + 1].0 == Some(true) && next.chars().next().is_some_and(is_word_char);
+
+            if !(cur_ends_mono_word && next_starts_mono_word) {
+                continue;
+            }
+
+            let key = format!("{}\n{}", cur, next);
+            if let Some(rel_pos) = text[cursor..].find(&key) {
+                let start = cursor + rel_pos;
+                let end = start + key.len();
+                out.push_str(&text[last_copied..start]);
+                out.push_str(cur);
+                out.push_str(next);
+                last_copied = end;
+                cursor = end;
+            }
+        }
+    }
+
+    out.push_str(&text[last_copied..]);
+    out
+}
+
+/// Finds the document's body-text font size: the most common non-whitespace
+/// glyph size across the whole book, bucketed to the nearest 0.5pt. Headings
+/// are then anything meaningfully larger than this baseline.
+fn compute_body_size(text_pages: &[TextPage]) -> f32 {
+    let mut counts: std::collections::HashMap<u32, usize> = std::collections::HashMap::new();
+
+    for text_page in text_pages {
+        for block in text_page.blocks() {
+            if block.r#type() != TextBlockType::Text {
+                continue;
+            }
+            for line in block.lines() {
+                for ch in line.chars() {
+                    let Some(c) = ch.char() else { continue };
+                    if c.is_whitespace() {
+                        continue;
+                    }
+                    let bucket = (ch.size() * 2.0).round() as u32;
+                    *counts.entry(bucket).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    match counts.into_iter().max_by_key(|(_, count)| *count) {
+        Some((bucket, _)) if bucket > 0 => bucket as f32 / 2.0,
+        _ => 12.0,
+    }
+}
+
+/// Prefixes lines set in a meaningfully larger font than the document's body
+/// text with `HEADING_MARK` + a level digit, so `structure_detector` can
+/// trust real typography instead of guessing from capitalization — which
+/// misclassifies a short ALL-CAPS acronym like "CQRS" (body-sized, just a
+/// list label) as a chapter heading. The three size tiers below were
+/// calibrated against this book's actual heading sizes (chapter titles ~28pt,
+/// section headings ~17-19pt, subsections ~14-15pt, against a ~10.5pt body),
+/// with margin on both sides of each cutoff.
+fn mark_headings(text: &str, text_page: &TextPage, body_size: f32) -> String {
+    if body_size <= 0.0 {
+        return text.to_string();
+    }
+
+    let mut ranges: Vec<(usize, usize, u8)> = Vec::new();
+    let mut cursor = 0usize;
+
+    for block in text_page.blocks() {
+        if block.r#type() != TextBlockType::Text {
+            continue;
+        }
+        for line in block.lines() {
+            let mut line_text = String::new();
+            let mut max_size: f32 = 0.0;
+            for ch in line.chars() {
+                let Some(c) = ch.char() else { continue };
+                line_text.push(c);
+                if !c.is_whitespace() {
+                    max_size = max_size.max(ch.size());
+                }
+            }
+
+            let trimmed = line_text.trim();
+            if trimmed.is_empty() || trimmed.len() > 120 {
+                continue;
+            }
+
+            let ratio = max_size / body_size;
+            let level: u8 = if ratio >= 2.2 {
+                1
+            } else if ratio >= 1.55 {
+                2
+            } else if ratio >= 1.25 {
+                3
+            } else {
+                continue;
+            };
+
+            if let Some(rel_pos) = text[cursor..].find(&line_text) {
+                let start = cursor + rel_pos;
+                let end = start + line_text.len();
+                ranges.push((start, end, level));
+                cursor = end;
+            }
+        }
+    }
+
+    if ranges.is_empty() {
+        return text.to_string();
+    }
+
+    let mut out = String::with_capacity(text.len() + ranges.len() * 2);
+    let mut last = 0usize;
+    for (start, end, level) in ranges {
+        out.push_str(&text[last..start]);
+        out.push(HEADING_MARK);
+        out.push_str(&level.to_string());
+        out.push_str(&text[start..end]);
+        last = end;
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
 fn strip_page_numbers(pages: &mut Vec<String>) {
     for page in pages.iter_mut() {
-        // Iterate until no more footer/header lines are removed from either end.
-        // This handles multi-line footers where removing the page number exposes
-        // a bare pipe (or other separator) on the adjacent line.
-        loop {
-            let lines: Vec<&str> = page.lines().collect();
-            if lines.is_empty() {
-                break;
-            }
-
-            let first_non_empty = lines.iter().position(|l| !l.trim().is_empty());
-            let last_non_empty = lines.iter().rposition(|l| !l.trim().is_empty());
-
-            let mut remove_indices = Vec::new();
-
-            if let Some(idx) = first_non_empty {
-                if is_page_number(lines[idx].trim()) {
-                    remove_indices.push(idx);
-                }
-            }
-
-            if let Some(idx) = last_non_empty {
-                if !remove_indices.contains(&idx) && is_page_number(lines[idx].trim()) {
-                    remove_indices.push(idx);
-                }
-            }
-
-            if remove_indices.is_empty() {
-                break;
-            }
-
-            let new_lines: Vec<&str> = lines
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| !remove_indices.contains(i))
-                .map(|(_, l)| *l)
-                .collect();
-            *page = new_lines.join("\n");
-        }
+        // Scan every line, not just the page string's first/last line: running
+        // headers/footers can end up mid-string when MuPDF's block ordering
+        // places a marginal text block ahead of the body text ending, so a
+        // boundary-only check misses them.
+        let filtered: Vec<&str> = page
+            .lines()
+            .filter(|l| !is_page_number(l.trim()))
+            .collect();
+        *page = filtered.join("\n");
     }
 }
 
@@ -444,5 +786,15 @@ mod tests {
         let mut pages = vec!["Page 7\n\nThe actual chapter text starts here.".to_string()];
         strip_page_numbers(&mut pages);
         assert_eq!(pages[0], "\nThe actual chapter text starts here.");
+    }
+
+    #[test]
+    fn strip_removes_footer_stuck_in_the_middle_of_the_page() {
+        // Regression: MuPDF block ordering can place a running footer ahead of
+        // trailing body text, so it's neither the first nor the last line.
+        let mut pages =
+            vec!["Body text before.\n\n6 | Chapter 1: Domain Modeling\n\nBody text after.".to_string()];
+        strip_page_numbers(&mut pages);
+        assert_eq!(pages[0], "Body text before.\n\n\nBody text after.");
     }
 }

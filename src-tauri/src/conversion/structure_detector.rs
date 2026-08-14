@@ -1,3 +1,4 @@
+use super::text_extractor::{CODE_BLOCK_START, CODE_BLOCK_END, HEADING_MARK};
 use super::StructureOptions;
 
 #[derive(Debug, Clone)]
@@ -7,6 +8,7 @@ pub enum StructuredContent {
     ListItem { text: String, ordered: bool },
     Image { resource_path: String, alt: String, display_width_pct: Option<u32> },
     Footnote { number: u32, text: String },
+    CodeBlock { text: String },
     BlankLine,
     PageBreak,
 }
@@ -34,6 +36,23 @@ pub fn detect_structure(
         while line_idx < body_end {
             let line = lines[line_idx].trim();
 
+            if line.chars().next() == Some(CODE_BLOCK_START) {
+                line_idx += 1;
+                let mut code_lines = Vec::new();
+                while line_idx < body_end && lines[line_idx].trim().chars().next() != Some(CODE_BLOCK_END) {
+                    code_lines.push(lines[line_idx]);
+                    line_idx += 1;
+                }
+                // Skip the closing marker line itself, if found.
+                if line_idx < body_end {
+                    line_idx += 1;
+                }
+                result.push(StructuredContent::CodeBlock {
+                    text: code_lines.join("\n"),
+                });
+                continue;
+            }
+
             if line.is_empty() {
                 if options.paragraph_detection {
                     result.push(StructuredContent::BlankLine);
@@ -50,17 +69,21 @@ pub fn detect_structure(
                 }
             }
 
-            if options.detect_headings && is_heading(line, &lines, line_idx, options.heading_level_threshold) {
-                let level = detect_heading_level(line);
-                if level <= options.heading_level_threshold {
-                    result.push(StructuredContent::Heading {
-                        level,
-                        text: line.to_string(),
-                    });
-                    line_idx += 1;
-                    continue;
+            if options.detect_headings {
+                if let Some((level, text)) = parse_heading_mark(line) {
+                    if level <= options.heading_level_threshold {
+                        result.push(StructuredContent::Heading {
+                            level,
+                            text: text.to_string(),
+                        });
+                        line_idx += 1;
+                        continue;
+                    }
+                    // Marked but below the requested threshold: fall through
+                    // and treat its real text as ordinary content below.
                 }
             }
+            let line = strip_heading_mark(line);
 
             if options.paragraph_detection {
                 let mut paragraph_text = String::from(line);
@@ -70,7 +93,7 @@ pub fn detect_structure(
                     if next.is_empty() {
                         break;
                     }
-                    if options.detect_headings && is_heading(next, &lines, line_idx, options.heading_level_threshold) {
+                    if options.detect_headings && next.chars().next() == Some(HEADING_MARK) {
                         break;
                     }
                     if options.list_detection && detect_list_item(next).is_some() {
@@ -104,89 +127,28 @@ pub fn detect_structure(
     result
 }
 
-fn is_heading(line: &str, lines: &[&str], idx: usize, _max_level: u8) -> bool {
-    if line.len() > 80 || line.ends_with('.') || line.ends_with(',') {
-        return false;
+/// Reads a `HEADING_MARK` + level-digit prefix (written by
+/// `text_extractor::mark_headings` from real font-size data), returning the
+/// level and the heading's real text with the marker stripped.
+fn parse_heading_mark(line: &str) -> Option<(u8, &str)> {
+    let mut chars = line.char_indices();
+    let (_, first) = chars.next()?;
+    if first != HEADING_MARK {
+        return None;
     }
-
-    if line.trim().is_empty() {
-        return false;
+    let (digit_idx, digit_char) = chars.next()?;
+    let level = digit_char.to_digit(10)? as u8;
+    if level == 0 {
+        return None;
     }
-
-    let has_blank_before = idx == 0 || (idx > 0 && lines[idx - 1].trim().is_empty());
-
-    if !has_blank_before {
-        return false;
-    }
-
-    if looks_like_noise(line) {
-        return false;
-    }
-
-    is_uppercase(line) || is_title_case(line)
+    Some((level, &line[digit_idx + digit_char.len_utf8()..]))
 }
 
-fn looks_like_noise(line: &str) -> bool {
-    let alpha_count = line.chars().filter(|c| c.is_alphabetic()).count();
-    if alpha_count <= 1 {
-        return true;
+fn strip_heading_mark(line: &str) -> &str {
+    match parse_heading_mark(line) {
+        Some((_, text)) => text,
+        None => line,
     }
-
-    if line.contains('=') || line.contains(';') || line.contains('$')
-        || line.contains('{') || line.contains('}') || line.contains('_')
-    {
-        return true;
-    }
-
-    let upper = line.to_uppercase();
-    if upper.starts_with("ISBN") {
-        return true;
-    }
-
-    let word_count = line.split_whitespace().count();
-    if word_count == 1 && alpha_count <= 3 {
-        return true;
-    }
-
-    false
-}
-
-fn detect_heading_level(line: &str) -> u8 {
-    if is_uppercase(line) {
-        1
-    } else {
-        2
-    }
-}
-
-fn is_uppercase(text: &str) -> bool {
-    let alpha_chars: String = text.chars().filter(|c| c.is_alphabetic()).collect();
-    !alpha_chars.is_empty() && alpha_chars == alpha_chars.to_uppercase()
-}
-
-fn is_title_case(text: &str) -> bool {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.is_empty() {
-        return false;
-    }
-
-    let skip_words = ["a", "an", "the", "and", "but", "or", "for", "nor",
-                       "at", "by", "in", "of", "on", "to", "up", "is", "it"];
-
-    let significant_words: Vec<&&str> = words
-        .iter()
-        .filter(|w| !skip_words.contains(&w.to_lowercase().as_str()))
-        .collect();
-
-    if significant_words.is_empty() {
-        return false;
-    }
-
-    significant_words.iter().all(|w| {
-        w.chars()
-            .next()
-            .map_or(false, |c| c.is_uppercase() || !c.is_alphabetic())
-    })
 }
 
 fn detect_list_item(line: &str) -> Option<StructuredContent> {
@@ -455,8 +417,8 @@ mod tests {
     }
 
     #[test]
-    fn detects_uppercase_heading() {
-        let pages = vec!["\nINTRODUCTION\n\nSome paragraph text here.".to_string()];
+    fn detects_marked_heading() {
+        let pages = vec![format!("\n{}1INTRODUCTION\n\nSome paragraph text here.", HEADING_MARK)];
         let result = detect_structure(&pages, &default_options());
 
         let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { level: 1, text } if text == "INTRODUCTION"));
@@ -494,11 +456,33 @@ mod tests {
     fn respects_heading_detection_off() {
         let mut opts = default_options();
         opts.detect_headings = false;
-        let pages = vec!["\nINTRODUCTION\n\nText here.".to_string()];
+        let pages = vec![format!("\n{}1INTRODUCTION\n\nText here.", HEADING_MARK)];
         let result = detect_structure(&pages, &opts);
 
         let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
         assert!(!has_heading);
+
+        // The heading's real text still surfaces as a paragraph, marker stripped.
+        let paragraphs: Vec<_> = result.iter()
+            .filter_map(|c| match c {
+                StructuredContent::Paragraph { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(paragraphs.contains(&"INTRODUCTION"));
+    }
+
+    #[test]
+    fn heading_above_level_threshold_falls_back_to_paragraph() {
+        let mut opts = default_options();
+        opts.heading_level_threshold = 2;
+        let pages = vec![format!("\n{}3Some Subsection\n\nText here.", HEADING_MARK)];
+        let result = detect_structure(&pages, &opts);
+
+        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+        assert!(!has_heading);
+        let has_paragraph = result.iter().any(|c| matches!(c, StructuredContent::Paragraph { text } if text == "Some Subsection"));
+        assert!(has_paragraph);
     }
 
     #[test]
@@ -522,50 +506,41 @@ mod tests {
     }
 
     #[test]
-    fn rejects_single_letter_as_heading() {
-        let pages = vec!["\nA\n\nSome text.".to_string()];
-        let result = detect_structure(&pages, &default_options());
-        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
-        assert!(!has_heading);
-    }
-
-    #[test]
-    fn rejects_short_code_as_heading() {
-        let pages = vec!["\nLB\n\nSome text.".to_string()];
-        let result = detect_structure(&pages, &default_options());
-        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
-        assert!(!has_heading);
-    }
-
-    #[test]
-    fn rejects_lines_with_code_characters() {
+    fn unmarked_lines_are_never_headings_regardless_of_content() {
+        // Heading detection is driven entirely by the font-size marker
+        // `text_extractor::mark_headings` writes from real PDF typography, not
+        // by guessing from capitalization/shape. A short ALL-CAPS acronym like
+        // "CQRS" set at body text size (a list label, not a heading) must not
+        // be promoted just because it looks heading-shaped.
         for line in &[
+            "A",
+            "LB",
+            "CQRS",
             "VAGRANTFILE_API_VERSION = \"2\"",
             "$ANSIBLE_VAULT;1.1;AES256",
             "DOWNLOAD_WORDPRESS",
+            "ISBN 978-1-78439-829-3",
+            "INTRODUCTION",
+            "CHAPTER ONE",
+            "GETTING STARTED",
+            "Part Two",
         ] {
             let pages = vec![format!("\n{}\n\nText.", line)];
             let result = detect_structure(&pages, &default_options());
             let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
-            assert!(!has_heading, "should not detect '{}' as heading", line);
+            assert!(!has_heading, "'{}' has no heading marker, should never be a heading", line);
         }
     }
 
     #[test]
-    fn rejects_isbn_as_heading() {
-        let pages = vec!["\nISBN 978-1-78439-829-3\n\nText.".to_string()];
-        let result = detect_structure(&pages, &default_options());
-        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
-        assert!(!has_heading);
-    }
-
-    #[test]
-    fn accepts_real_chapter_headings() {
-        for title in &["INTRODUCTION", "CHAPTER ONE", "GETTING STARTED", "Part Two"] {
-            let pages = vec![format!("\n{}\n\nText.", title)];
+    fn accepts_real_chapter_headings_regardless_of_casing() {
+        // Marker-driven detection trusts the font size, not the text's shape:
+        // even lowercase text is a heading when MuPDF's real size data marked it.
+        for (level, title) in [(1u8, "INTRODUCTION"), (2, "Chapter One"), (3, "getting started")] {
+            let pages = vec![format!("\n{}{}{}\n\nText.", HEADING_MARK, level, title)];
             let result = detect_structure(&pages, &default_options());
-            let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
-            assert!(has_heading, "should detect '{}' as heading", title);
+            let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { level: l, text } if *l == level && text == title));
+            assert!(has_heading, "should detect '{}' as a level-{} heading", title, level);
         }
     }
 
@@ -694,5 +669,55 @@ mod tests {
     #[test]
     fn no_false_positive_for_ordinals() {
         assert!(parse_superscript_start("\u{00B2}nd edition").is_none());
+    }
+
+    // -- code block detection --
+
+    #[test]
+    fn extracts_marked_code_block() {
+        let page = format!(
+            "Some prose before.\n\n{}\nclass Batch:\n    def __init__(self):\n        pass\n{}\n\nMore prose after.",
+            CODE_BLOCK_START, CODE_BLOCK_END
+        );
+        let result = detect_structure(&[page], &default_options());
+
+        let code_blocks: Vec<_> = result.iter()
+            .filter_map(|c| match c {
+                StructuredContent::CodeBlock { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(code_blocks, vec!["class Batch:\n    def __init__(self):\n        pass"]);
+    }
+
+    #[test]
+    fn code_block_lines_are_not_parsed_as_paragraphs_or_headings() {
+        let page = format!(
+            "{}\nCQRS\ndef allocate(line):\n    pass\n{}",
+            CODE_BLOCK_START, CODE_BLOCK_END
+        );
+        let result = detect_structure(&[page], &default_options());
+
+        let has_heading = result.iter().any(|c| matches!(c, StructuredContent::Heading { .. }));
+        let has_paragraph = result.iter().any(|c| matches!(c, StructuredContent::Paragraph { .. }));
+        assert!(!has_heading);
+        assert!(!has_paragraph);
+    }
+
+    #[test]
+    fn text_around_code_block_is_still_parsed_normally() {
+        let page = format!(
+            "Intro paragraph.\n\n{}\nprint(\"hi\")\n{}\n\nClosing paragraph.",
+            CODE_BLOCK_START, CODE_BLOCK_END
+        );
+        let result = detect_structure(&[page], &default_options());
+
+        let paragraphs: Vec<_> = result.iter()
+            .filter_map(|c| match c {
+                StructuredContent::Paragraph { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(paragraphs, vec!["Intro paragraph.", "Closing paragraph."]);
     }
 }

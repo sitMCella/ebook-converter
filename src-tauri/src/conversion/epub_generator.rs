@@ -217,6 +217,10 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                     ));
                 }
             }
+            StructuredContent::CodeBlock { text } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                html.push_str(&format!("<pre><code>{}</code></pre>\n", escape_xml(text)));
+            }
             StructuredContent::Footnote { .. } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
             }
@@ -637,5 +641,29 @@ mod tests {
         ];
         let xhtml = content_to_xhtml(&content, false);
         assert!(!xhtml.contains("footnotes"));
+    }
+
+    // -- code blocks --
+
+    #[test]
+    fn xhtml_renders_code_block_as_pre_code() {
+        let content = vec![
+            StructuredContent::CodeBlock {
+                text: "class Batch:\n    def __init__(self):\n        pass".to_string(),
+            },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(xhtml.contains("<pre><code>class Batch:\n    def __init__(self):\n        pass</code></pre>"));
+    }
+
+    #[test]
+    fn xhtml_escapes_code_block_content() {
+        let content = vec![
+            StructuredContent::CodeBlock {
+                text: "if x < 1 && y > 0:".to_string(),
+            },
+        ];
+        let xhtml = content_to_xhtml(&content, false);
+        assert!(xhtml.contains("if x &lt; 1 &amp;&amp; y &gt; 0:"));
     }
 }

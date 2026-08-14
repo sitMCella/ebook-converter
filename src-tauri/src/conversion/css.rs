@@ -119,6 +119,23 @@ sup {{
     font-size: 0.75em;
     line-height: 0;
     vertical-align: super;
+}}
+
+pre {{
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.85em;
+    line-height: 1.3;
+    white-space: pre-wrap;
+    margin: 1em 0;
+    padding: 0.6em;
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    text-indent: 0;
+}}
+
+pre code {{
+    font-family: inherit;
+    font-size: inherit;
 }}"#,
         font_family = font_family,
         font_size = options.base_font_size,
