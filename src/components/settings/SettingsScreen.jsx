@@ -324,6 +324,30 @@ export function SettingsScreen() {
                 ))}
               </select>
             </SettingRow>
+            <SettingRow label="Include table of contents">
+              <SaveIndicator visible={lastChanged === 'pageHandling.includeToc'} />
+              <Toggle
+                checked={settings.pageHandling.includeToc}
+                onChange={(v) => handleChange('pageHandling', 'includeToc', v)}
+                label="Include table of contents"
+              />
+            </SettingRow>
+            <SettingRow label="Keep notes">
+              <SaveIndicator visible={lastChanged === 'pageHandling.keepNotes'} />
+              <Toggle
+                checked={settings.pageHandling.keepNotes}
+                onChange={(v) => handleChange('pageHandling', 'keepNotes', v)}
+                label="Keep notes"
+              />
+            </SettingRow>
+            <SettingRow label="Keep chapter labels">
+              <SaveIndicator visible={lastChanged === 'pageHandling.keepChapterLabels'} />
+              <Toggle
+                checked={settings.pageHandling.keepChapterLabels}
+                onChange={(v) => handleChange('pageHandling', 'keepChapterLabels', v)}
+                label="Keep chapter labels"
+              />
+            </SettingRow>
           </SettingGroup>
         </div>
       </div>

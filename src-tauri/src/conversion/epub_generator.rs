@@ -1,6 +1,7 @@
 use super::css;
 use super::image_extractor::ExtractedImage;
 use super::structure_detector::{StructuredContent, superscript_to_digit};
+use super::text_extractor::{NOTE_FIELD_SEP, NOTE_REF_END, NOTE_REF_START};
 use std::collections::HashSet;
 use super::{ConversionOptions, ConversionResult};
 use crate::pdf::PdfMetadata;
@@ -62,7 +63,7 @@ pub fn generate_epub(
         let cover_resource_path = format!("images/cover.{}", cover_ext);
 
         builder
-            .add_resource(&cover_resource_path, cover.data.as_slice(), &cover.mime_type)
+            .add_cover_image(&cover_resource_path, cover.data.as_slice(), &cover.mime_type)
             .map_err(|e| format!("Failed to add cover image: {}", e))?;
 
         let cover_xhtml = format!(
@@ -86,19 +87,17 @@ pub fn generate_epub(
     }
 
     for image in images {
-        let ext = match image.mime_type.as_str() {
-            "image/jpeg" => "jpg",
-            "image/png" => "png",
-            "image/webp" => "webp",
-            _ => "bin",
-        };
-        let resource_path = format!("images/{}_{}.{}", image.id, image.width, ext);
+        let resource_path = image.resource_path();
         builder
             .add_resource(&resource_path, image.data.as_slice(), &image.mime_type)
             .map_err(|e| format!("Failed to add image {}: {}", image.id, e))?;
     }
 
-    let xhtml = content_to_xhtml(content, options.page_handling.keep_page_breaks);
+    let xhtml = content_to_xhtml(
+        content,
+        options.page_handling.keep_page_breaks,
+        options.output.epub_version != "epub2",
+    );
     let epub_content = EpubContent::new("content.xhtml", xhtml.as_bytes())
         .title(title)
         .reftype(ReferenceType::Text);
@@ -122,11 +121,79 @@ pub fn generate_epub(
     })
 }
 
-fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> String {
-    let mut html = String::from(
+/// Note-reference state shared across the document while rendering.
+struct InlineState<'a> {
+    footnote_numbers: &'a HashSet<u32>,
+    link_footnotes: bool,
+    linked_footnotes: HashSet<u32>,
+    /// Ids of kept notes whose first reference got an `id="noteref-N"`
+    /// anchor, so the note can link back to it.
+    linked_notes: HashSet<u32>,
+    epub3: bool,
+}
+
+impl InlineState<'_> {
+    /// Escapes `text` and turns footnote/note reference marks into links.
+    fn render(&mut self, text: &str) -> String {
+        let escaped = escape_xml(text);
+        let escaped = if self.link_footnotes {
+            linkify_footnote_refs(&escaped, self.footnote_numbers, &mut self.linked_footnotes)
+        } else {
+            escaped
+        };
+        render_note_refs(&escaped, self.epub3, &mut self.linked_notes)
+    }
+}
+
+/// Replaces `NOTE_REF_START` id `NOTE_FIELD_SEP` label `NOTE_REF_END` marks
+/// (already XML-escaped text) with superscript links to `#note-<id>`. The
+/// first reference to each note gets the `noteref-<id>` anchor the note
+/// links back to. Malformed marks are dropped, never leaked into the XHTML.
+fn render_note_refs(text: &str, epub3: bool, linked: &mut HashSet<u32>) -> String {
+    if !text.contains(NOTE_REF_START) {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len() + 64);
+    let mut rest = text;
+    while let Some(start) = rest.find(NOTE_REF_START) {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + NOTE_REF_START.len_utf8()..];
+        let Some(end) = after.find(NOTE_REF_END) else {
+            rest = after;
+            continue;
+        };
+        let inner = &after[..end];
+        rest = &after[end + NOTE_REF_END.len_utf8()..];
+        let Some((id, label)) = inner.split_once(NOTE_FIELD_SEP) else { continue };
+        let Ok(id) = id.parse::<u32>() else { continue };
+        let anchor = if linked.insert(id) {
+            format!(" id=\"noteref-{id}\"")
+        } else {
+            String::new()
+        };
+        let semantics = if epub3 {
+            " epub:type=\"noteref\" role=\"doc-noteref\""
+        } else {
+            ""
+        };
+        out.push_str(&format!(
+            "<a class=\"noteref\" href=\"#note-{id}\"{anchor}{semantics}><sup>{label}</sup></a>"
+        ));
+    }
+    out.push_str(rest);
+    out
+}
+
+fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool, epub3: bool) -> String {
+    let html_open = if epub3 {
+        r#"<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">"#
+    } else {
+        r#"<html xmlns="http://www.w3.org/1999/xhtml">"#
+    };
+    let mut html = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+{html_open}
 <head><title></title><link rel="stylesheet" type="text/css" href="stylesheet.css" /></head>
 <body>
 "#,
@@ -147,39 +214,42 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
 
     let mut in_ul = false;
     let mut in_ol = false;
-    let mut linked_refs: HashSet<u32> = HashSet::new();
+    let mut inline = InlineState {
+        footnote_numbers: &footnote_numbers,
+        link_footnotes: link_refs,
+        linked_footnotes: HashSet::new(),
+        linked_notes: HashSet::new(),
+        epub3,
+    };
 
     for item in content {
         match item {
             StructuredContent::Heading { level, text } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
                 let tag = format!("h{}", level.min(&6));
-                let escaped = escape_xml(text);
-                let text_out = if link_refs {
-                    linkify_footnote_refs(&escaped, &footnote_numbers, &mut linked_refs)
-                } else {
-                    escaped
-                };
+                let text_out = inline.render(text);
                 html.push_str(&format!("<{}>{}</{}>\n", tag, text_out, tag));
+            }
+            StructuredContent::ChapterLabel { text } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                html.push_str(&format!("<p class=\"chapter-label\">{}</p>\n", inline.render(text)));
             }
             StructuredContent::Paragraph { text } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
-                let escaped = escape_xml(text);
-                let text_out = if link_refs {
-                    linkify_footnote_refs(&escaped, &footnote_numbers, &mut linked_refs)
-                } else {
-                    escaped
-                };
+                let text_out = inline.render(text);
                 html.push_str(&format!("<p>{}</p>\n", text_out));
             }
-            StructuredContent::ListItem { text, ordered } => {
+            StructuredContent::ListItem { text, ordered, number } => {
                 if *ordered {
                     if in_ul {
                         html.push_str("</ul>\n");
                         in_ul = false;
                     }
                     if !in_ol {
-                        html.push_str("<ol>\n");
+                        match number {
+                            Some(n) if *n != 1 => html.push_str(&format!("<ol start=\"{}\">\n", n)),
+                            _ => html.push_str("<ol>\n"),
+                        }
                         in_ol = true;
                     }
                 } else {
@@ -192,12 +262,7 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                         in_ul = true;
                     }
                 }
-                let escaped = escape_xml(text);
-                let text_out = if link_refs {
-                    linkify_footnote_refs(&escaped, &footnote_numbers, &mut linked_refs)
-                } else {
-                    escaped
-                };
+                let text_out = inline.render(text);
                 html.push_str(&format!("<li>{}</li>\n", text_out));
             }
             StructuredContent::Image { resource_path, alt, display_width_pct } => {
@@ -216,6 +281,29 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
                         escape_xml(alt)
                     ));
                 }
+            }
+            StructuredContent::CodeBlock { text } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                html.push_str(&format!("<pre><code>{}</code></pre>\n", inline.render(text)));
+            }
+            StructuredContent::Note { id, label, text } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                let label_text = format!("Note {}", escape_xml(label));
+                // Link back to the reference when the text cites this note.
+                let label_html = if inline.linked_notes.contains(id) {
+                    format!("<a class=\"note-label\" href=\"#noteref-{id}\">{label_text}</a>")
+                } else {
+                    format!("<span class=\"note-label\">{label_text}</span>")
+                };
+                let semantics = if epub3 {
+                    " epub:type=\"footnote\" role=\"doc-footnote\""
+                } else {
+                    ""
+                };
+                html.push_str(&format!(
+                    "<div class=\"note\" id=\"note-{id}\"{semantics}><p>{label_html} {}</p></div>\n",
+                    inline.render(text)
+                ));
             }
             StructuredContent::Footnote { .. } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
@@ -247,7 +335,7 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool) -> St
         html.push_str("<hr class=\"footnote-separator\" />\n");
         html.push_str("<ol>\n");
         for (num, text) in &footnotes {
-            let back_link = if linked_refs.contains(num) {
+            let back_link = if inline.linked_footnotes.contains(num) {
                 format!(" <a href=\"#fnref{}\">\u{21A9}</a>", num)
             } else {
                 String::new()
@@ -369,6 +457,9 @@ mod tests {
                 keep_page_breaks: false,
                 remove_page_numbers: true,
                 cover_page: "auto".to_string(),
+                include_toc: false,
+                keep_notes: false,
+                keep_chapter_labels: true,
             },
             output_folder: String::new(),
             book_id: None,
@@ -409,6 +500,7 @@ mod tests {
             width: 600,
             height: 800,
             display_width_pct: None,
+            page_y: None,
         }
     }
 
@@ -454,6 +546,37 @@ mod tests {
         generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(output.exists());
         assert!(std::fs::metadata(&output).unwrap().len() > 0);
+    }
+
+    fn read_opf(path: &std::path::Path) -> String {
+        use std::io::Read;
+        let file = std::fs::File::open(path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let mut opf = String::new();
+        archive.by_name("OEBPS/content.opf").unwrap().read_to_string(&mut opf).unwrap();
+        opf
+    }
+
+    #[test]
+    fn epub3_cover_is_declared_in_opf() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("cover_meta.epub");
+        let cover = make_cover("image/png");
+        generate_epub(&make_content("Text"), &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let opf = read_opf(&output);
+        assert!(opf.contains("<meta name=\"cover\" content=\"cover-image\"/>"));
+        assert!(opf.contains("properties=\"cover-image\""));
+    }
+
+    #[test]
+    fn epub2_cover_is_declared_in_opf() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("cover_meta2.epub");
+        let cover = make_cover("image/png");
+        let mut opts = test_options();
+        opts.output.epub_version = "epub2".to_string();
+        generate_epub(&make_content("Text"), &[], Some(&cover), &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
+        assert!(read_opf(&output).contains("<meta name=\"cover\" content=\"cover-image\"/>"));
     }
 
     #[test]
@@ -508,6 +631,7 @@ mod tests {
             width: 200,
             height: 200,
             display_width_pct: None,
+            page_y: None,
         }];
         let cover = make_cover("image/jpeg");
         let result = generate_epub(&content, &body_images, Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
@@ -529,6 +653,16 @@ mod tests {
         assert!(output.exists());
     }
 
+    #[test]
+    fn xhtml_renders_chapter_label_before_title() {
+        let content = vec![
+            StructuredContent::ChapterLabel { text: "CHAPTER 1".to_string() },
+            StructuredContent::Heading { level: 1, text: "Domain Modeling".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains("<p class=\"chapter-label\">CHAPTER 1</p>\n<h1>Domain Modeling</h1>"));
+    }
+
     // -- keep_page_breaks --
 
     #[test]
@@ -538,7 +672,7 @@ mod tests {
             StructuredContent::PageBreak,
             StructuredContent::Paragraph { text: "Page two".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, false);
+        let xhtml = content_to_xhtml(&content, false, true);
         assert!(!xhtml.contains("page-break"));
     }
 
@@ -549,21 +683,33 @@ mod tests {
             StructuredContent::PageBreak,
             StructuredContent::Paragraph { text: "Page two".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, true);
+        let xhtml = content_to_xhtml(&content, true, true);
         assert!(xhtml.contains(r#"<hr class="page-break" />"#));
     }
 
     #[test]
     fn xhtml_page_break_closes_list_before_hr() {
         let content = vec![
-            StructuredContent::ListItem { text: "item".to_string(), ordered: false },
+            StructuredContent::ListItem { text: "item".to_string(), ordered: false, number: None },
             StructuredContent::PageBreak,
             StructuredContent::Paragraph { text: "next page".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, true);
+        let xhtml = content_to_xhtml(&content, true, true);
         let ul_close = xhtml.find("</ul>").unwrap();
         let hr_pos = xhtml.find(r#"<hr class="page-break" />"#).unwrap();
         assert!(ul_close < hr_pos);
+    }
+
+    #[test]
+    fn xhtml_resumed_ordered_list_keeps_numbering() {
+        let content = vec![
+            StructuredContent::ListItem { text: "first".to_string(), ordered: true, number: Some(1) },
+            StructuredContent::Paragraph { text: "interlude".to_string() },
+            StructuredContent::ListItem { text: "second".to_string(), ordered: true, number: Some(2) },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains("<ol>\n<li>first</li>"));
+        assert!(xhtml.contains("<ol start=\"2\">\n<li>second</li>"));
     }
 
     #[test]
@@ -601,7 +747,7 @@ mod tests {
             StructuredContent::Paragraph { text: "Body text.".to_string() },
             StructuredContent::Footnote { number: 1, text: "A footnote.".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, false);
+        let xhtml = content_to_xhtml(&content, false, true);
         assert!(xhtml.contains("<section class=\"footnotes\">"));
         assert!(xhtml.contains("id=\"fn1\""));
         assert!(xhtml.contains("A footnote."));
@@ -613,7 +759,7 @@ mod tests {
             StructuredContent::Paragraph { text: "Text\u{00B9} here.".to_string() },
             StructuredContent::Footnote { number: 1, text: "The note.".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, false);
+        let xhtml = content_to_xhtml(&content, false, true);
         assert!(xhtml.contains("href=\"#fn1\""));
         assert!(xhtml.contains("id=\"fnref1\""));
         assert!(xhtml.contains("<sup>1</sup>"));
@@ -625,7 +771,7 @@ mod tests {
             StructuredContent::Paragraph { text: "Ref\u{00B9} here.".to_string() },
             StructuredContent::Footnote { number: 1, text: "Note text.".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, false);
+        let xhtml = content_to_xhtml(&content, false, true);
         assert!(xhtml.contains("href=\"#fnref1\""));
         assert!(xhtml.contains("\u{21A9}"));
     }
@@ -635,7 +781,109 @@ mod tests {
         let content = vec![
             StructuredContent::Paragraph { text: "Just text.".to_string() },
         ];
-        let xhtml = content_to_xhtml(&content, false);
+        let xhtml = content_to_xhtml(&content, false, true);
         assert!(!xhtml.contains("footnotes"));
+    }
+
+    // -- code blocks --
+
+    #[test]
+    fn xhtml_renders_code_block_as_pre_code() {
+        let content = vec![
+            StructuredContent::CodeBlock {
+                text: "class Batch:\n    def __init__(self):\n        pass".to_string(),
+            },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains("<pre><code>class Batch:\n    def __init__(self):\n        pass</code></pre>"));
+    }
+
+    #[test]
+    fn xhtml_escapes_code_block_content() {
+        let content = vec![
+            StructuredContent::CodeBlock {
+                text: "if x < 1 && y > 0:".to_string(),
+            },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains("if x &lt; 1 &amp;&amp; y &gt; 0:"));
+    }
+
+    // -- kept notes --
+
+    fn note_ref_text(id: u32, label: &str) -> String {
+        format!("{NOTE_REF_START}{id}{NOTE_FIELD_SEP}{label}{NOTE_REF_END}")
+    }
+
+    #[test]
+    fn xhtml_links_note_reference_and_note_both_ways() {
+        let content = vec![
+            StructuredContent::Paragraph { text: format!("about algorithms.{}", note_ref_text(4, "1")) },
+            StructuredContent::Note { id: 4, label: "1".into(), text: "CRC cards & more.".into() },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains(
+            r##"algorithms.<a class="noteref" href="#note-4" id="noteref-4" epub:type="noteref" role="doc-noteref"><sup>1</sup></a>"##
+        ));
+        assert!(xhtml.contains(
+            r##"<div class="note" id="note-4" epub:type="footnote" role="doc-footnote"><p><a class="note-label" href="#noteref-4">Note 1</a> CRC cards &amp; more.</p></div>"##
+        ));
+        assert!(xhtml.contains(r#"xmlns:epub="http://www.idpf.org/2007/ops""#));
+        assert!(!xhtml.contains(NOTE_REF_START));
+    }
+
+    #[test]
+    fn xhtml_same_label_in_two_chapters_links_to_distinct_notes() {
+        let content = vec![
+            StructuredContent::Paragraph { text: format!("Chapter one{}", note_ref_text(1, "1")) },
+            StructuredContent::Note { id: 1, label: "1".into(), text: "First.".into() },
+            StructuredContent::Paragraph { text: format!("Chapter two{}", note_ref_text(2, "1")) },
+            StructuredContent::Note { id: 2, label: "1".into(), text: "Second.".into() },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains(r##"href="#note-1" id="noteref-1""##));
+        assert!(xhtml.contains(r##"href="#note-2" id="noteref-2""##));
+        assert!(xhtml.contains(r#"id="note-1""#));
+        assert!(xhtml.contains(r#"id="note-2""#));
+    }
+
+    #[test]
+    fn xhtml_repeated_reference_gets_anchor_once() {
+        let r = note_ref_text(9, "*");
+        let content = vec![
+            StructuredContent::Paragraph { text: format!("a{r} b{r}") },
+            StructuredContent::Note { id: 9, label: "*".into(), text: "Star.".into() },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert_eq!(xhtml.matches(r#"id="noteref-9""#).count(), 1);
+        assert_eq!(xhtml.matches(r##"href="#note-9""##).count(), 2);
+    }
+
+    #[test]
+    fn xhtml_uncited_note_has_no_back_link() {
+        let content = vec![StructuredContent::Note { id: 3, label: "2".into(), text: "Alone.".into() }];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains(r#"<span class="note-label">Note 2</span> Alone."#));
+        assert!(!xhtml.contains("#noteref-3"));
+    }
+
+    #[test]
+    fn xhtml_epub2_notes_omit_epub3_attributes() {
+        let content = vec![
+            StructuredContent::Paragraph { text: format!("text{}", note_ref_text(1, "1")) },
+            StructuredContent::Note { id: 1, label: "1".into(), text: "Note.".into() },
+        ];
+        let xhtml = content_to_xhtml(&content, false, false);
+        assert!(xhtml.contains(r##"<a class="noteref" href="#note-1" id="noteref-1"><sup>1</sup></a>"##));
+        assert!(xhtml.contains(r#"<div class="note" id="note-1"><p>"#));
+        assert!(!xhtml.contains("epub:type"));
+        assert!(!xhtml.contains("xmlns:epub"));
+    }
+
+    #[test]
+    fn render_note_refs_drops_malformed_marks() {
+        let mut linked = HashSet::new();
+        let text = format!("a{NOTE_REF_START}x{NOTE_FIELD_SEP}1{NOTE_REF_END}b{NOTE_REF_START}c");
+        assert_eq!(render_note_refs(&text, true, &mut linked), "abc");
     }
 }

@@ -33,6 +33,22 @@ h1 {{
     line-height: 1.2;
 }}
 
+p.chapter-label {{
+    font-size: 1.1em;
+    font-weight: bold;
+    text-indent: 0;
+    text-align: left;
+    margin-top: 2em;
+    margin-bottom: 0;
+    page-break-before: always;
+    page-break-after: avoid;
+}}
+
+p.chapter-label + h1, p.chapter-label + h2 {{
+    margin-top: 0.2em;
+    page-break-before: auto;
+}}
+
 h2 {{
     font-size: 1.3em;
     margin-top: 1.5em;
@@ -115,10 +131,59 @@ section.footnotes p {{
     margin: 0;
 }}
 
+div.note {{
+    margin: 0.6em 0 0.9em 0;
+    padding: 0.4em 0.7em;
+    border-left: 3px solid #888;
+    background-color: #f4f4f4;
+    font-size: 0.85em;
+    line-height: 1.4;
+    text-align: left;
+    text-indent: 0;
+    page-break-inside: avoid;
+}}
+
+div.note p {{
+    margin: 0;
+    text-indent: 0;
+}}
+
+.note-label {{
+    font-weight: bold;
+    text-decoration: none;
+    margin-right: 0.3em;
+}}
+
+a.noteref {{
+    text-decoration: none;
+}}
+
 sup {{
     font-size: 0.75em;
     line-height: 0;
     vertical-align: super;
+}}
+
+pre {{
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.85em;
+    line-height: 1.3;
+    white-space: pre-wrap;
+    text-align: left;
+    hyphens: none;
+    -webkit-hyphens: none;
+    -epub-hyphens: none;
+    adobe-hyphenate: none;
+    margin: 1em 0;
+    padding: 0.6em;
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    text-indent: 0;
+}}
+
+pre code {{
+    font-family: inherit;
+    font-size: inherit;
 }}"#,
         font_family = font_family,
         font_size = options.base_font_size,

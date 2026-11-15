@@ -66,6 +66,22 @@ pub struct PageHandlingOptions {
     pub keep_page_breaks: bool,
     pub remove_page_numbers: bool,
     pub cover_page: String,
+    /// Keep the PDF's own table-of-contents pages in the EPUB body. Off by
+    /// default: the EPUB navigation document already provides a TOC.
+    #[serde(default)]
+    pub include_toc: bool,
+    /// Keep notes (footnotes at the bottom of PDF pages) in the EPUB body.
+    /// Off by default: MuPDF often places them in the middle of the prose.
+    #[serde(default)]
+    pub keep_notes: bool,
+    /// Keep the chapter label printed above chapter titles ("CHAPTER 1").
+    /// On by default; when off the label is removed from the EPUB.
+    #[serde(default = "default_true")]
+    pub keep_chapter_labels: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Serialize, Clone)]

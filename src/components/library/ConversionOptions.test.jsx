@@ -23,11 +23,11 @@ import { ConversionOptions } from './ConversionOptions';
 import { useEffect } from 'react';
 
 function SeedAndRender({ file }) {
-  const { dispatch } = useImportContext();
+  const { state, dispatch } = useImportContext();
   useEffect(() => {
     dispatch({ type: 'ADD_FILES', files: [file] });
   }, []);
-  return <ConversionOptions file={file} />;
+  return <ConversionOptions file={state.files.get(file.path) || file} />;
 }
 
 async function renderOptions(fileOverrides = {}) {
@@ -125,6 +125,63 @@ describe('ConversionOptions', () => {
         pageHandling: { coverPage: 'none' },
       },
     });
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
+
+  it('shows table of contents toggle with global default when expanded', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    const toggle = screen.getByLabelText('Include table of contents');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling table of contents creates an override', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    await user.click(screen.getByLabelText('Include table of contents'));
+    expect(screen.getByLabelText('Include table of contents')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
+
+  it('counts table of contents override in override count', async () => {
+    await renderOptions({
+      overrides: {
+        pageHandling: { includeToc: true },
+      },
+    });
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
+
+  it('shows keep notes toggle with global default when expanded', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    expect(screen.getByLabelText('Keep notes')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling keep notes creates an override', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    await user.click(screen.getByLabelText('Keep notes'));
+    expect(screen.getByLabelText('Keep notes')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
+
+  it('toggling keep chapter labels off creates an override', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    expect(screen.getByLabelText('Keep chapter labels')).toHaveAttribute('aria-checked', 'true');
+    await user.click(screen.getByLabelText('Keep chapter labels'));
+    expect(screen.getByLabelText('Keep chapter labels')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText(/1 custom/)).toBeInTheDocument();
   });
 });

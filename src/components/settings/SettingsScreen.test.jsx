@@ -69,6 +69,34 @@ describe('SettingsScreen', () => {
 
     const removePageNumbers = screen.getByLabelText('Remove page numbers');
     expect(removePageNumbers).toHaveAttribute('aria-checked', 'true');
+
+    const includeToc = screen.getByLabelText('Include table of contents');
+    expect(includeToc).toHaveAttribute('aria-checked', 'false');
+
+    const keepNotes = screen.getByLabelText('Keep notes');
+    expect(keepNotes).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling "Keep chapter labels" disables it', async () => {
+    await renderSettingsScreen();
+    const toggle = screen.getByLabelText('Keep chapter labels');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling "Keep notes" enables it', async () => {
+    await renderSettingsScreen();
+    const toggle = screen.getByLabelText('Keep notes');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('toggling "Include table of contents" enables it', async () => {
+    await renderSettingsScreen();
+    const toggle = screen.getByLabelText('Include table of contents');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
   it('toggling a switch updates its value', async () => {
