@@ -173,4 +173,15 @@ describe('ConversionOptions', () => {
     expect(screen.getByLabelText('Keep notes')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText(/1 custom/)).toBeInTheDocument();
   });
+
+  it('toggling keep chapter labels off creates an override', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    expect(screen.getByLabelText('Keep chapter labels')).toHaveAttribute('aria-checked', 'true');
+    await user.click(screen.getByLabelText('Keep chapter labels'));
+    expect(screen.getByLabelText('Keep chapter labels')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
 });

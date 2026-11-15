@@ -340,6 +340,14 @@ export function SettingsScreen() {
                 label="Keep notes"
               />
             </SettingRow>
+            <SettingRow label="Keep chapter labels">
+              <SaveIndicator visible={lastChanged === 'pageHandling.keepChapterLabels'} />
+              <Toggle
+                checked={settings.pageHandling.keepChapterLabels}
+                onChange={(v) => handleChange('pageHandling', 'keepChapterLabels', v)}
+                label="Keep chapter labels"
+              />
+            </SettingRow>
           </SettingGroup>
         </div>
       </div>

@@ -112,6 +112,7 @@ pub async fn run_conversion(
     emit_progress(app, &path_owned, "detecting_structure", 50, "Detecting headings and structure...");
 
     let mut content = structure_detector::detect_structure(&pages, &options.structure);
+    content = structure_detector::apply_chapter_labels(content, options.page_handling.keep_chapter_labels);
 
     emit_progress(app, &path_owned, "detecting_structure", 70, "Structure detection complete");
 

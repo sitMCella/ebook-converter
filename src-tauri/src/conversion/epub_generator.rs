@@ -230,6 +230,10 @@ fn content_to_xhtml(content: &[StructuredContent], keep_page_breaks: bool, epub3
                 let text_out = inline.render(text);
                 html.push_str(&format!("<{}>{}</{}>\n", tag, text_out, tag));
             }
+            StructuredContent::ChapterLabel { text } => {
+                close_lists(&mut html, &mut in_ul, &mut in_ol);
+                html.push_str(&format!("<p class=\"chapter-label\">{}</p>\n", inline.render(text)));
+            }
             StructuredContent::Paragraph { text } => {
                 close_lists(&mut html, &mut in_ul, &mut in_ol);
                 let text_out = inline.render(text);
@@ -455,6 +459,7 @@ mod tests {
                 cover_page: "auto".to_string(),
                 include_toc: false,
                 keep_notes: false,
+                keep_chapter_labels: true,
             },
             output_folder: String::new(),
             book_id: None,
@@ -646,6 +651,16 @@ mod tests {
         let result = generate_epub(&content, &[], Some(&cover), &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
         assert!(result.has_cover);
         assert!(output.exists());
+    }
+
+    #[test]
+    fn xhtml_renders_chapter_label_before_title() {
+        let content = vec![
+            StructuredContent::ChapterLabel { text: "CHAPTER 1".to_string() },
+            StructuredContent::Heading { level: 1, text: "Domain Modeling".to_string() },
+        ];
+        let xhtml = content_to_xhtml(&content, false, true);
+        assert!(xhtml.contains("<p class=\"chapter-label\">CHAPTER 1</p>\n<h1>Domain Modeling</h1>"));
     }
 
     // -- keep_page_breaks --

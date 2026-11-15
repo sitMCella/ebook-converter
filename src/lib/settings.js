@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS = {
     coverPage: 'auto',
     includeToc: false,
     keepNotes: false,
+    keepChapterLabels: true,
   },
 };
 

@@ -33,6 +33,22 @@ h1 {{
     line-height: 1.2;
 }}
 
+p.chapter-label {{
+    font-size: 1.1em;
+    font-weight: bold;
+    text-indent: 0;
+    text-align: left;
+    margin-top: 2em;
+    margin-bottom: 0;
+    page-break-before: always;
+    page-break-after: avoid;
+}}
+
+p.chapter-label + h1, p.chapter-label + h2 {{
+    margin-top: 0.2em;
+    page-break-before: auto;
+}}
+
 h2 {{
     font-size: 1.3em;
     margin-top: 1.5em;

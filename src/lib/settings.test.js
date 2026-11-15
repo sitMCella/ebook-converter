@@ -26,6 +26,10 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.pageHandling.keepNotes).toBe(false);
   });
 
+  it('has keepChapterLabels enabled by default in pageHandling group', () => {
+    expect(DEFAULT_SETTINGS.pageHandling.keepChapterLabels).toBe(true);
+  });
+
   it('does not have outputLocation', () => {
     expect(DEFAULT_SETTINGS.outputLocation).toBeUndefined();
   });

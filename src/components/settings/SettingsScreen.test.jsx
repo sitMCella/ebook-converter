@@ -77,6 +77,14 @@ describe('SettingsScreen', () => {
     expect(keepNotes).toHaveAttribute('aria-checked', 'false');
   });
 
+  it('toggling "Keep chapter labels" disables it', async () => {
+    await renderSettingsScreen();
+    const toggle = screen.getByLabelText('Keep chapter labels');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+  });
+
   it('toggling "Keep notes" enables it', async () => {
     await renderSettingsScreen();
     const toggle = screen.getByLabelText('Keep notes');

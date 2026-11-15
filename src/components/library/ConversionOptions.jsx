@@ -273,6 +273,16 @@ export function ConversionOptions({ file }) {
               onReset={() => resetOverride('pageHandling', 'keepNotes')}
             />
           </OverrideRow>
+
+          <OverrideRow label="Keep chapter labels">
+            <ToggleControl
+              value={overrides.pageHandling?.keepChapterLabels}
+              defaultValue={globalSettings.pageHandling.keepChapterLabels}
+              label="Keep chapter labels"
+              onChange={(v) => setOverride('pageHandling', 'keepChapterLabels', v)}
+              onReset={() => resetOverride('pageHandling', 'keepChapterLabels')}
+            />
+          </OverrideRow>
         </div>
       )}
     </div>

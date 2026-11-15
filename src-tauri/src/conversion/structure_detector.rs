@@ -17,6 +17,9 @@ pub enum StructuredContent {
     /// the text that cite it; `label` is the printed mark ("1", "*").
     Note { id: u32, label: String, text: String },
     CodeBlock { text: String },
+    /// A chapter label printed above a chapter title ("CHAPTER 1", "Part II",
+    /// "Appendix A"), rendered as a small line attached to the title.
+    ChapterLabel { text: String },
     BlankLine,
     PageBreak,
 }
@@ -184,6 +187,63 @@ pub fn detect_structure(
     }
 
     place_notes_after_refs(result)
+}
+
+/// Words that introduce a chapter label line ("CHAPTER 1", "Part II").
+const CHAPTER_LABEL_WORDS: &[&str] = &["chapter", "part", "appendix", "book", "section", "lesson", "unit"];
+
+/// True when `text` is a bare chapter label: one of `CHAPTER_LABEL_WORDS`
+/// followed by a single short number/letter token ("1", "II", "A", "One").
+fn is_chapter_label(text: &str) -> bool {
+    let mut words = text.split_whitespace();
+    let (Some(word), Some(number), None) = (words.next(), words.next(), words.next()) else {
+        return false;
+    };
+    CHAPTER_LABEL_WORDS.contains(&word.to_lowercase().as_str())
+        && number.chars().count() <= 12
+        && number.chars().all(|c| c.is_alphanumeric())
+}
+
+/// Handles the chapter label printed above a chapter title ("CHAPTER 1" over
+/// "Domain Modeling"). Font-size heading detection sees it as a separate,
+/// smaller heading, so it ended up stranded before the title's page break.
+/// A heading or paragraph that is only a chapter label and is followed
+/// (blank lines aside) by a level-1/2 heading becomes a `ChapterLabel` kept
+/// with that title, or is removed when `keep` is false.
+pub fn apply_chapter_labels(content: Vec<StructuredContent>, keep: bool) -> Vec<StructuredContent> {
+    let mut result = Vec::with_capacity(content.len());
+    let mut items = content.into_iter().peekable();
+    let mut pending: Vec<StructuredContent> = Vec::new();
+    while let Some(item) = items.next() {
+        let label = match &item {
+            StructuredContent::Heading { text, .. } | StructuredContent::Paragraph { text }
+                if is_chapter_label(text.trim()) =>
+            {
+                Some(text.trim().to_string())
+            }
+            _ => None,
+        };
+        let Some(label) = label else {
+            result.push(item);
+            continue;
+        };
+        // Look past blank lines for the chapter title.
+        pending.clear();
+        while matches!(items.peek(), Some(StructuredContent::BlankLine)) {
+            pending.push(items.next().unwrap());
+        }
+        let followed_by_title = matches!(
+            items.peek(),
+            Some(StructuredContent::Heading { level, text }) if *level <= 2 && !is_chapter_label(text.trim())
+        );
+        if !followed_by_title {
+            result.push(item);
+        } else if keep {
+            result.push(StructuredContent::ChapterLabel { text: label });
+        }
+        result.append(&mut pending);
+    }
+    result
 }
 
 /// Parses a `NOTE_START` line written by `text_extractor` for a kept note.
@@ -548,6 +608,52 @@ fn extract_page_footnotes(lines: &[&str]) -> (Vec<(u32, String)>, usize) {
 mod tests {
     use super::*;
     use crate::conversion::text_extractor::NOTE_REF_END;
+
+    fn heading(level: u8, text: &str) -> StructuredContent {
+        StructuredContent::Heading { level, text: text.to_string() }
+    }
+
+    #[test]
+    fn chapter_label_recognized() {
+        assert!(is_chapter_label("CHAPTER 1"));
+        assert!(is_chapter_label("Part II"));
+        assert!(is_chapter_label("Appendix A"));
+        assert!(!is_chapter_label("Chapter 1: Domain Modeling"));
+        assert!(!is_chapter_label("Chapters"));
+        assert!(!is_chapter_label("Domain Modeling"));
+    }
+
+    #[test]
+    fn chapter_label_kept_before_title() {
+        let content = vec![
+            heading(2, "CHAPTER 1"),
+            StructuredContent::BlankLine,
+            heading(1, "Domain Modeling"),
+        ];
+        let result = apply_chapter_labels(content, true);
+        assert!(matches!(&result[0], StructuredContent::ChapterLabel { text } if text == "CHAPTER 1"));
+        assert!(matches!(result[1], StructuredContent::BlankLine));
+        assert!(matches!(&result[2], StructuredContent::Heading { level: 1, text } if text == "Domain Modeling"));
+    }
+
+    #[test]
+    fn chapter_label_removed_before_title() {
+        let content = vec![heading(2, "CHAPTER 1"), heading(1, "Domain Modeling")];
+        let result = apply_chapter_labels(content, false);
+        assert_eq!(result.len(), 1);
+        assert!(matches!(&result[0], StructuredContent::Heading { level: 1, text } if text == "Domain Modeling"));
+    }
+
+    #[test]
+    fn chapter_label_without_title_left_alone() {
+        let content = vec![
+            heading(2, "Chapter 3"),
+            StructuredContent::Paragraph { text: "Body.".into() },
+        ];
+        let result = apply_chapter_labels(content, false);
+        assert!(matches!(&result[0], StructuredContent::Heading { level: 2, text } if text == "Chapter 3"));
+        assert_eq!(result.len(), 2);
+    }
 
     fn default_options() -> StructureOptions {
         StructureOptions {

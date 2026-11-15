@@ -74,6 +74,14 @@ pub struct PageHandlingOptions {
     /// Off by default: MuPDF often places them in the middle of the prose.
     #[serde(default)]
     pub keep_notes: bool,
+    /// Keep the chapter label printed above chapter titles ("CHAPTER 1").
+    /// On by default; when off the label is removed from the EPUB.
+    #[serde(default = "default_true")]
+    pub keep_chapter_labels: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Serialize, Clone)]
