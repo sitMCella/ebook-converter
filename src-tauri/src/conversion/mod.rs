@@ -66,6 +66,10 @@ pub struct PageHandlingOptions {
     pub keep_page_breaks: bool,
     pub remove_page_numbers: bool,
     pub cover_page: String,
+    /// Keep the PDF's own table-of-contents pages in the EPUB body. Off by
+    /// default: the EPUB navigation document already provides a TOC.
+    #[serde(default)]
+    pub include_toc: bool,
 }
 
 #[derive(Serialize, Clone)]

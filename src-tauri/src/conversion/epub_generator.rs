@@ -62,7 +62,7 @@ pub fn generate_epub(
         let cover_resource_path = format!("images/cover.{}", cover_ext);
 
         builder
-            .add_resource(&cover_resource_path, cover.data.as_slice(), &cover.mime_type)
+            .add_cover_image(&cover_resource_path, cover.data.as_slice(), &cover.mime_type)
             .map_err(|e| format!("Failed to add cover image: {}", e))?;
 
         let cover_xhtml = format!(
@@ -373,6 +373,7 @@ mod tests {
                 keep_page_breaks: false,
                 remove_page_numbers: true,
                 cover_page: "auto".to_string(),
+                include_toc: false,
             },
             output_folder: String::new(),
             book_id: None,
@@ -458,6 +459,37 @@ mod tests {
         generate_epub(&content, &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
         assert!(output.exists());
         assert!(std::fs::metadata(&output).unwrap().len() > 0);
+    }
+
+    fn read_opf(path: &std::path::Path) -> String {
+        use std::io::Read;
+        let file = std::fs::File::open(path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let mut opf = String::new();
+        archive.by_name("OEBPS/content.opf").unwrap().read_to_string(&mut opf).unwrap();
+        opf
+    }
+
+    #[test]
+    fn epub3_cover_is_declared_in_opf() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("cover_meta.epub");
+        let cover = make_cover("image/png");
+        generate_epub(&make_content("Text"), &[], Some(&cover), &test_metadata(), &test_options(), output.to_str().unwrap()).unwrap();
+        let opf = read_opf(&output);
+        assert!(opf.contains("<meta name=\"cover\" content=\"cover-image\"/>"));
+        assert!(opf.contains("properties=\"cover-image\""));
+    }
+
+    #[test]
+    fn epub2_cover_is_declared_in_opf() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("cover_meta2.epub");
+        let cover = make_cover("image/png");
+        let mut opts = test_options();
+        opts.output.epub_version = "epub2".to_string();
+        generate_epub(&make_content("Text"), &[], Some(&cover), &test_metadata(), &opts, output.to_str().unwrap()).unwrap();
+        assert!(read_opf(&output).contains("<meta name=\"cover\" content=\"cover-image\"/>"));
     }
 
     #[test]

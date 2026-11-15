@@ -10,6 +10,18 @@ For detailed guides and usage information, see the [GitHub Wiki](https://github.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture documentation, including frontend and backend details, project structure, security model, CI/CD, code signing, and custom app icons.
 
+## Output Directory
+
+Imported PDFs and converted EPUBs are stored in the app data directory, one folder per book:
+
+| Platform | Path |
+|----------|------|
+| macOS    | `~/Library/Application Support/sitmcella.ebook-converter/books/<book-id>/` |
+| Linux    | `~/.local/share/sitmcella.ebook-converter/books/<book-id>/` |
+| Windows  | `%APPDATA%\sitmcella.ebook-converter\books\<book-id>\` |
+
+Each `<book-id>` folder (a UUID) contains the copied source PDF, `cover.png`, and the converted `<pdf-name>.epub`.
+
 ## Prerequisites
 
 ### All Platforms

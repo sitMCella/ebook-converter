@@ -25,7 +25,9 @@ pub async fn run_conversion(
         return Err("Conversion cancelled".to_string());
     }
 
-    let mut pages = text_extractor::extract_text(path, &options.page_handling)?;
+    let extracted = text_extractor::extract_text(path, &options.page_handling)?;
+    let mut pages = extracted.pages;
+    let mut first_content_page = extracted.first_page;
 
     if pages.is_empty() {
         return Err("No text could be extracted from the PDF".to_string());
@@ -39,12 +41,14 @@ pub async fn run_conversion(
         }
     };
 
-    if cover_image.is_some() && pages.len() > 1 {
+    // Page 1 is still in the text only when nothing was trimmed from the front.
+    if cover_image.is_some() && first_content_page == 1 && pages.len() > 1 {
         let pdf_page_count = Document::load(path)
             .map(|doc| doc.get_pages().len())
             .unwrap_or(0);
         if pages.len() >= pdf_page_count {
             pages.remove(0);
+            first_content_page = 2;
         }
     }
 
@@ -76,7 +80,7 @@ pub async fn run_conversion(
 
     emit_progress(app, &path_owned, "extracting_images", 50, "Extracting images...");
 
-    let images = if options.images.extract_images {
+    let mut images = if options.images.extract_images {
         let app_ref = app;
         let path_ref = path_owned.clone();
         match image_extractor::extract_images(path, &options.images, &|msg| {
@@ -109,7 +113,16 @@ pub async fn run_conversion(
         Vec::new()
     };
 
-    insert_images_into_content(&mut content, &images);
+    // Page-1 images are the cover art (already in the EPUB as the cover);
+    // repeating them in the body shows the cover again, often as tiles.
+    // Images from pages trimmed off the front (e.g. front matter before the
+    // TOC) go with them.
+    images.retain(|img| {
+        let page = image_page_number(img);
+        page >= first_content_page && !(cover_image.is_some() && page == 1)
+    });
+
+    insert_images_into_content(&mut content, &images, first_content_page);
 
     if cancel_token.load(Ordering::Relaxed) {
         return Err("Conversion cancelled".to_string());
@@ -190,9 +203,18 @@ fn resolve_output_path(pdf_path: &str, output_folder: &str) -> Result<String, St
     Err("Too many existing files with the same name".to_string())
 }
 
+fn image_page_number(img: &image_extractor::ExtractedImage) -> u32 {
+    img.id
+        .strip_prefix("img_p")
+        .and_then(|rest| rest.split('_').next())
+        .and_then(|n| n.parse::<u32>().ok())
+        .unwrap_or(0)
+}
+
 fn insert_images_into_content(
     content: &mut Vec<structure_detector::StructuredContent>,
     images: &[image_extractor::ExtractedImage],
+    first_page: u32,
 ) {
     if images.is_empty() {
         return;
@@ -202,16 +224,10 @@ fn insert_images_into_content(
         std::collections::HashMap::new();
 
     for img in images {
-        let page_num = img
-            .id
-            .strip_prefix("img_p")
-            .and_then(|rest| rest.split('_').next())
-            .and_then(|n| n.parse::<u32>().ok())
-            .unwrap_or(0);
-        page_images.entry(page_num).or_default().push(img);
+        page_images.entry(image_page_number(img)).or_default().push(img);
     }
 
-    let mut current_page: u32 = 1;
+    let mut current_page: u32 = first_page;
     let mut i = 0;
 
     while i < content.len() {
@@ -264,6 +280,56 @@ fn insert_images_into_content(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_image(id: &str) -> image_extractor::ExtractedImage {
+        image_extractor::ExtractedImage {
+            id: id.to_string(),
+            data: vec![],
+            mime_type: "image/jpeg".to_string(),
+            width: 10,
+            height: 10,
+            display_width_pct: None,
+        }
+    }
+
+    fn image_positions(content: &[structure_detector::StructuredContent]) -> Vec<(usize, String)> {
+        content
+            .iter()
+            .enumerate()
+            .filter_map(|(i, c)| match c {
+                structure_detector::StructuredContent::Image { resource_path, .. } => {
+                    Some((i, resource_path.clone()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn image_page_number_parses_id() {
+        assert_eq!(image_page_number(&test_image("img_p12_0_3")), 12);
+        assert_eq!(image_page_number(&test_image("cover_Im0")), 0);
+    }
+
+    #[test]
+    fn insert_images_respects_first_page_offset() {
+        use structure_detector::StructuredContent::{PageBreak, Paragraph};
+        // Content starts at PDF page 2 (page 1 became the cover).
+        let mut content = vec![
+            Paragraph { text: "page 2".into() },
+            PageBreak,
+            Paragraph { text: "page 3".into() },
+        ];
+        let images = vec![test_image("img_p2_0_1"), test_image("img_p3_0_2")];
+        insert_images_into_content(&mut content, &images, 2);
+        let positions = image_positions(&content);
+        assert_eq!(positions.len(), 2);
+        // Page-2 image lands before the first page break, page-3 image at the end.
+        assert!(positions[0].1.starts_with("images/img_p2_"));
+        assert_eq!(positions[0].0, 1);
+        assert!(positions[1].1.starts_with("images/img_p3_"));
+        assert_eq!(positions[1].0, content.len() - 1);
+    }
 
     #[test]
     fn resolve_output_path_basic() {

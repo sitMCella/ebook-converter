@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronRight, ChevronDown, X } from 'lucide-react';
 import { useImportContext } from '../../contexts/ImportContext';
 import { useSettings } from '../../contexts/SettingsContext';
+import { Toggle } from '../ui/Toggle';
 
 const QUALITY_OPTIONS = [
   { value: 'high', label: 'High' },
@@ -103,6 +104,30 @@ function NumberControl({
           </span>
         )}
       </div>
+      {isOverridden && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="p-0.5 rounded hover:bg-[var(--surface-2)] text-[var(--text-muted)] cursor-pointer"
+          aria-label={`Reset to default`}
+        >
+          <X size={14} />
+        </button>
+      )}
+    </>
+  );
+}
+
+function ToggleControl({ value, defaultValue, label, onChange, onReset }) {
+  const isOverridden = value !== undefined && value !== defaultValue;
+  const displayValue = isOverridden ? value : defaultValue;
+
+  return (
+    <>
+      <Toggle checked={displayValue} onChange={onChange} label={label} />
+      {!isOverridden && (
+        <span className="text-[12px] text-[var(--text-muted)]">(default)</span>
+      )}
       {isOverridden && (
         <button
           type="button"
@@ -226,6 +251,16 @@ export function ConversionOptions({ file }) {
               options={COVER_PAGE_OPTIONS}
               onChange={(v) => setOverride('pageHandling', 'coverPage', v)}
               onReset={() => resetOverride('pageHandling', 'coverPage')}
+            />
+          </OverrideRow>
+
+          <OverrideRow label="Include table of contents">
+            <ToggleControl
+              value={overrides.pageHandling?.includeToc}
+              defaultValue={globalSettings.pageHandling.includeToc}
+              label="Include table of contents"
+              onChange={(v) => setOverride('pageHandling', 'includeToc', v)}
+              onReset={() => resetOverride('pageHandling', 'includeToc')}
             />
           </OverrideRow>
         </div>

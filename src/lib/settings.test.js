@@ -18,6 +18,10 @@ describe('DEFAULT_SETTINGS', () => {
     expect(DEFAULT_SETTINGS.pageHandling.coverPage).toBe('auto');
   });
 
+  it('has includeToc disabled by default in pageHandling group', () => {
+    expect(DEFAULT_SETTINGS.pageHandling.includeToc).toBe(false);
+  });
+
   it('does not have outputLocation', () => {
     expect(DEFAULT_SETTINGS.outputLocation).toBeUndefined();
   });

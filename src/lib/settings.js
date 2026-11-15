@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS = {
     keepPageBreaks: false,
     removePageNumbers: true,
     coverPage: 'auto',
+    includeToc: false,
   },
 };
 

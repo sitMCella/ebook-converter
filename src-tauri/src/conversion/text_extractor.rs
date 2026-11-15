@@ -11,10 +11,150 @@ pub(crate) const CODE_BLOCK_END: char = '\u{E001}';
 /// ('1'-'6') for its level, e.g. "\u{E002}1Domain Modeling".
 pub(crate) const HEADING_MARK: char = '\u{E002}';
 
+/// Text pages extracted from a PDF, plus the 1-based PDF page number that
+/// `pages[0]` came from (before blank-page skipping), so callers can line up
+/// per-page resources such as images.
+pub struct ExtractedText {
+    pub pages: Vec<String>,
+    pub first_page: u32,
+}
+
+/// Headings that open a table of contents, compared case-insensitively.
+const TOC_TITLES: &[&str] = &[
+    "contents",
+    "table of contents",
+    "brief contents",
+    "contents at a glance",
+];
+
+/// How far into the document a text-detected table of contents may start.
+/// Front matter rarely runs longer; past this, a "Contents" heading is more
+/// likely a chapter title than the book's TOC.
+const TOC_SCAN_PAGES: usize = 30;
+
+fn is_toc_title(title: &str) -> bool {
+    let normalized = title
+        .trim()
+        .trim_end_matches(|c: char| c == ':' || c == '.')
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+    TOC_TITLES.contains(&normalized.as_str())
+}
+
+/// First non-blank line of a page's extracted text, without the heading marker.
+fn first_line(page_text: &str) -> Option<&str> {
+    page_text
+        .lines()
+        .map(|l| {
+            let l = l.trim();
+            match l.strip_prefix(HEADING_MARK) {
+                Some(rest) => rest.get(1..).unwrap_or("").trim(),
+                None => l,
+            }
+        })
+        .find(|l| !l.is_empty())
+}
+
+fn find_toc_in_outline(outlines: &[mupdf::Outline]) -> Option<usize> {
+    for outline in outlines {
+        if is_toc_title(&outline.title) {
+            if let Some(dest) = &outline.dest {
+                return Some(dest.loc.page_number as usize);
+            }
+        }
+        if let Some(page) = find_toc_in_outline(&outline.down) {
+            return Some(page);
+        }
+    }
+    None
+}
+
+/// 0-based index of the page where the table of contents starts. Prefers the
+/// PDF's bookmarks; falls back to a page in the front matter whose first line
+/// is a TOC heading. `None` when there is no TOC.
+fn find_toc_page(outlines: &[mupdf::Outline], pages: &[String]) -> Option<usize> {
+    let from_outline = find_toc_in_outline(outlines).filter(|&p| p < pages.len());
+    if from_outline.is_some() {
+        return from_outline;
+    }
+    pages
+        .iter()
+        .take(TOC_SCAN_PAGES)
+        .position(|p| first_line(p).is_some_and(is_toc_title))
+}
+
+/// Flattens the outline tree into (title, 0-based page) pairs in reading order.
+fn flatten_outline<'a>(outlines: &'a [mupdf::Outline], out: &mut Vec<(&'a str, Option<usize>)>) {
+    for outline in outlines {
+        out.push((
+            outline.title.as_str(),
+            outline.dest.as_ref().map(|d| d.loc.page_number as usize),
+        ));
+        flatten_outline(&outline.down, out);
+    }
+}
+
+/// Page of the first bookmark after the TOC bookmark that points past
+/// `toc_start`, i.e. where the content following the TOC begins.
+fn find_toc_end_in_outline(outlines: &[mupdf::Outline], toc_start: usize) -> Option<usize> {
+    let mut flat = Vec::new();
+    flatten_outline(outlines, &mut flat);
+    let toc_idx = flat.iter().position(|(title, _)| is_toc_title(title))?;
+    flat[toc_idx + 1..]
+        .iter()
+        .filter_map(|&(_, page)| page)
+        .find(|&p| p > toc_start)
+}
+
+/// Whether a line ends with a page reference (arabic or roman numeral), as TOC
+/// entries do: "Preface . . . xi", "1. Introduction 3".
+fn ends_with_page_ref(line: &str) -> bool {
+    let last = line
+        .trim()
+        .trim_end_matches(|c: char| c == '.' || c == '|')
+        .split_whitespace()
+        .last()
+        .unwrap_or("");
+    !last.is_empty()
+        && (last.chars().all(|c| c.is_ascii_digit())
+            || last.chars().all(|c| "ivxlcdm".contains(c.to_ascii_lowercase())))
+}
+
+/// Whether a page reads like a TOC continuation: most of its lines end in a
+/// page reference.
+fn looks_like_toc_page(page_text: &str) -> bool {
+    let lines: Vec<&str> = page_text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with(HEADING_MARK))
+        .collect();
+    if lines.len() < 3 {
+        return false;
+    }
+    let refs = lines.iter().filter(|l| ends_with_page_ref(l)).count();
+    refs * 2 >= lines.len()
+}
+
+/// 0-based index of the first page after the table of contents that starts at
+/// `toc_start`. Prefers the PDF's bookmarks; falls back to scanning forward
+/// while pages still look like TOC entries.
+fn find_toc_end(outlines: &[mupdf::Outline], pages: &[String], toc_start: usize) -> usize {
+    if let Some(end) = find_toc_end_in_outline(outlines, toc_start).filter(|&p| p <= pages.len()) {
+        return end;
+    }
+    let mut end = toc_start + 1;
+    while end < pages.len() && looks_like_toc_page(&pages[end]) {
+        end += 1;
+    }
+    end.min(pages.len())
+}
+
 pub fn extract_text(
     path: &str,
     options: &PageHandlingOptions,
-) -> Result<Vec<String>, String> {
+) -> Result<ExtractedText, String> {
     let doc = mupdf::Document::open(path)
         .map_err(|e| format!("Failed to open PDF: {}", e))?;
 
@@ -57,6 +197,8 @@ pub fn extract_text(
         pages.push(text);
     }
 
+    let mut first_page: u32 = 1;
+
     if options.page_range == "custom" {
         let from = options.page_range_from.unwrap_or(1).max(1) as usize;
         let to = options
@@ -66,10 +208,27 @@ pub fn extract_text(
             .min(pages.len());
 
         if from > to || from > pages.len() {
-            return Ok(Vec::new());
+            return Ok(ExtractedText { pages: Vec::new(), first_page: from as u32 });
         }
 
         pages = pages[(from - 1)..to].to_vec();
+        first_page = from as u32;
+    } else {
+        let outlines = doc.outlines().unwrap_or_default();
+        if let Some(toc_page) = find_toc_page(&outlines, &pages) {
+            // Front matter before the TOC (half-title, back-cover blurb, copyright,
+            // ...) is laid out for print and converts poorly; the cover itself is
+            // carried separately by the EPUB cover, so start the text at the TOC.
+            // Unless requested, skip the TOC pages too: the EPUB navigation
+            // document already provides one.
+            let start = if options.include_toc {
+                toc_page
+            } else {
+                find_toc_end(&outlines, &pages, toc_page)
+            };
+            pages.drain(..start);
+            first_page = start as u32 + 1;
+        }
     }
 
     if options.remove_page_numbers {
@@ -80,7 +239,7 @@ pub fn extract_text(
         pages.retain(|p| !p.trim().is_empty());
     }
 
-    Ok(pages)
+    Ok(ExtractedText { pages, first_page })
 }
 
 /// Finds text blocks whose lines are entirely set in a monospaced font (the
@@ -526,6 +685,82 @@ fn is_roman_numeral(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -- table of contents detection --
+
+    #[test]
+    fn toc_title_matches_common_headings() {
+        assert!(is_toc_title("Table of Contents"));
+        assert!(is_toc_title("  CONTENTS "));
+        assert!(is_toc_title("Contents:"));
+        assert!(is_toc_title("Brief  Contents"));
+        assert!(!is_toc_title("Contents of the Repository"));
+        assert!(!is_toc_title("Preface"));
+    }
+
+    #[test]
+    fn first_line_skips_blanks_and_heading_marker() {
+        let text = format!("\n  \n{}1Table of Contents\nPreface . . . 1", HEADING_MARK);
+        assert_eq!(first_line(&text), Some("Table of Contents"));
+        assert_eq!(first_line("   \n"), None);
+    }
+
+    #[test]
+    fn find_toc_page_falls_back_to_text_heading() {
+        let pages: Vec<String> = vec![
+            "Architecture Patterns".into(),
+            "".into(),
+            "Copyright © 2020".into(),
+            "Table of Contents\nPreface . . . xi".into(),
+            "Preface\nYou may be wondering".into(),
+        ];
+        assert_eq!(find_toc_page(&[], &pages), Some(3));
+    }
+
+    #[test]
+    fn find_toc_page_none_without_toc() {
+        let pages: Vec<String> = vec!["Title".into(), "Chapter 1\nText".into()];
+        assert_eq!(find_toc_page(&[], &pages), None);
+    }
+
+    #[test]
+    fn find_toc_end_scans_continuation_pages() {
+        let pages: Vec<String> = vec![
+            "Table of Contents\nPreface . . . xi\n1. Intro 1\n2. Basics 9".into(),
+            "3. Types . . . 20\n4. Traits 35\n5. Generics 50\nIndex 300".into(),
+            "Preface\nThis book is about Rust.\nIt covers many things.\nEnjoy.".into(),
+        ];
+        assert_eq!(find_toc_end(&[], &pages, 0), 2);
+    }
+
+    #[test]
+    fn find_toc_end_single_page_toc() {
+        let pages: Vec<String> = vec![
+            "Contents\nPreface xi\nIntro 1".into(),
+            "Chapter 1\nOnce upon a time there was a crab.\nIt liked Rust.".into(),
+        ];
+        assert_eq!(find_toc_end(&[], &pages, 0), 1);
+    }
+
+    #[test]
+    fn find_toc_end_stops_at_document_end() {
+        let pages: Vec<String> = vec!["Contents\nA 1\nB 2\nC 3".into(), "D 4\nE 5\nF 6".into()];
+        assert_eq!(find_toc_end(&[], &pages, 0), 2);
+    }
+
+    #[test]
+    fn ends_with_page_ref_detects_numbers() {
+        assert!(ends_with_page_ref("Preface . . . xi"));
+        assert!(ends_with_page_ref("1. Introduction 3"));
+        assert!(!ends_with_page_ref("This is a sentence."));
+    }
+
+    #[test]
+    fn find_toc_page_ignores_contents_heading_past_front_matter() {
+        let mut pages: Vec<String> = (0..TOC_SCAN_PAGES).map(|i| format!("Page {}", i)).collect();
+        pages.push("Contents\nChapter about contents".into());
+        assert_eq!(find_toc_page(&[], &pages), None);
+    }
 
     #[test]
     fn is_page_number_bare_digits() {

@@ -69,6 +69,16 @@ describe('SettingsScreen', () => {
 
     const removePageNumbers = screen.getByLabelText('Remove page numbers');
     expect(removePageNumbers).toHaveAttribute('aria-checked', 'true');
+
+    const includeToc = screen.getByLabelText('Include table of contents');
+    expect(includeToc).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling "Include table of contents" enables it', async () => {
+    await renderSettingsScreen();
+    const toggle = screen.getByLabelText('Include table of contents');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
   it('toggling a switch updates its value', async () => {

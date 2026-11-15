@@ -324,6 +324,14 @@ export function SettingsScreen() {
                 ))}
               </select>
             </SettingRow>
+            <SettingRow label="Include table of contents">
+              <SaveIndicator visible={lastChanged === 'pageHandling.includeToc'} />
+              <Toggle
+                checked={settings.pageHandling.includeToc}
+                onChange={(v) => handleChange('pageHandling', 'includeToc', v)}
+                label="Include table of contents"
+              />
+            </SettingRow>
           </SettingGroup>
         </div>
       </div>

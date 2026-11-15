@@ -11,6 +11,10 @@ pub struct ExtractedImage {
     pub display_width_pct: Option<u32>,
 }
 
+const MIN_COVER_WIDTH: u32 = 300;
+const MIN_COVER_HEIGHT: u32 = 400;
+const MIN_COVER_AREA: u64 = MIN_COVER_WIDTH as u64 * MIN_COVER_HEIGHT as u64;
+
 pub fn extract_cover_image(
     path: &str,
     cover_mode: &str,
@@ -33,6 +37,7 @@ pub fn extract_cover_image(
 
     let mut best_image: Option<ExtractedImage> = None;
     let mut best_area: u64 = 0;
+    let mut total_area: u64 = 0;
     let mut image_counter = 0u32;
 
     let cover_options = ImageOptions {
@@ -64,6 +69,7 @@ pub fn extract_cover_image(
         match extract_single_image(stream, &image_id, image_counter, &cover_options) {
             Ok(img) => {
                 let area = img.width as u64 * img.height as u64;
+                total_area += area;
                 if area > best_area {
                     best_area = area;
                     best_image = Some(img);
@@ -84,11 +90,22 @@ pub fn extract_cover_image(
         best_image = render_cover_fallback(path, &cover_options);
     }
 
+    // Cover art split into several tiles (common in publisher PDFs): when no
+    // single image dominates, any one tile is only a fragment of the cover, so
+    // rasterize the whole page. Require the tiles to add up to cover-sized
+    // artwork so a title page with a couple of small logos isn't promoted.
+    let is_tiled = image_counter > 1 && best_area * 2 <= total_area;
+    if is_tiled && total_area >= MIN_COVER_AREA {
+        if let Some(rendered) = render_cover_fallback(path, &cover_options) {
+            best_image = Some(rendered);
+        }
+    }
+
     match cover_mode {
         "firstPage" => Ok(best_image),
         "auto" => {
             if let Some(ref img) = best_image {
-                if img.width >= 300 && img.height >= 400 {
+                if img.width >= MIN_COVER_WIDTH && img.height >= MIN_COVER_HEIGHT {
                     Ok(best_image)
                 } else {
                     Ok(None)
@@ -1019,6 +1036,25 @@ mod tests {
     fn cover_firstpage_only_checks_page_1() {
         let file = create_pdf_with_image_on_page_2_only(600, 800);
         let result = extract_cover_image(file.path().to_str().unwrap(), "firstPage").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn cover_auto_renders_full_page_for_tiled_cover() {
+        // Two equal tiles, each below the auto threshold on its own.
+        let file = create_pdf_with_two_images(400, 300, 400, 300);
+        let img = extract_cover_image(file.path().to_str().unwrap(), "auto")
+            .unwrap()
+            .expect("tiled cover should be rendered as a whole page");
+        assert!(img.id.starts_with("cover_rendered"));
+        // Rendered at page aspect ratio (612x792), not a single tile's.
+        assert!(img.height > img.width);
+    }
+
+    #[test]
+    fn cover_does_not_render_page_for_small_tiles() {
+        let file = create_pdf_with_two_images(50, 50, 50, 50);
+        let result = extract_cover_image(file.path().to_str().unwrap(), "auto").unwrap();
         assert!(result.is_none());
     }
 
