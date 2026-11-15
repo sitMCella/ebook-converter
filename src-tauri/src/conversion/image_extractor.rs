@@ -9,6 +9,22 @@ pub struct ExtractedImage {
     pub width: u32,
     pub height: u32,
     pub display_width_pct: Option<u32>,
+    /// Vertical centre of the image on its PDF page (page units, y down), used
+    /// to place the image among the page's text. `None` when unknown.
+    pub page_y: Option<f32>,
+}
+
+impl ExtractedImage {
+    /// Path of the image inside the EPUB package.
+    pub fn resource_path(&self) -> String {
+        let ext = match self.mime_type.as_str() {
+            "image/jpeg" => "jpg",
+            "image/png" => "png",
+            "image/webp" => "webp",
+            _ => "bin",
+        };
+        format!("images/{}_{}.{}", self.id, self.width, ext)
+    }
 }
 
 const MIN_COVER_WIDTH: u32 = 300;
@@ -206,8 +222,17 @@ pub fn extract_images(
                 None
             };
 
+            // The image is drawn into the unit square mapped by `ctm`; its
+            // vertical extent is the y range of that square's corners.
+            let y_min = ctm.f + ctm.b.min(0.0) + ctm.d.min(0.0);
+            let y_max = ctm.f + ctm.b.max(0.0) + ctm.d.max(0.0);
+            let page_y = Some((y_min + y_max) / 2.0);
+
             match mupdf_image_to_extracted(mupdf_img, &image_id, image_counter, display_width_pct, options) {
-                Ok(img) => images.push(img),
+                Ok(mut img) => {
+                    img.page_y = page_y;
+                    images.push(img);
+                }
                 Err(e) => {
                     log::warn!("Skipping image {} on page {}: {}", img_idx, page_num, e);
                 }
@@ -570,6 +595,7 @@ fn process_image_data(
             width: actual_w,
             height: actual_h,
             display_width_pct: None,
+            page_y: None,
         });
     }
 
@@ -621,6 +647,7 @@ fn process_dynamic_image(
         width: w,
         height: h,
         display_width_pct: None,
+        page_y: None,
     })
 }
 

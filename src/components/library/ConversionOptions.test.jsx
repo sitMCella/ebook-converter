@@ -155,4 +155,22 @@ describe('ConversionOptions', () => {
     });
     expect(screen.getByText(/1 custom/)).toBeInTheDocument();
   });
+
+  it('shows keep notes toggle with global default when expanded', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    expect(screen.getByLabelText('Keep notes')).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling keep notes creates an override', async () => {
+    const user = userEvent.setup();
+    await renderOptions();
+
+    await user.click(screen.getByText('Conversion options'));
+    await user.click(screen.getByLabelText('Keep notes'));
+    expect(screen.getByLabelText('Keep notes')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/1 custom/)).toBeInTheDocument();
+  });
 });

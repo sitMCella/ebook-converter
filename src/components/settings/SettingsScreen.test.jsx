@@ -72,6 +72,16 @@ describe('SettingsScreen', () => {
 
     const includeToc = screen.getByLabelText('Include table of contents');
     expect(includeToc).toHaveAttribute('aria-checked', 'false');
+
+    const keepNotes = screen.getByLabelText('Keep notes');
+    expect(keepNotes).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('toggling "Keep notes" enables it', async () => {
+    await renderSettingsScreen();
+    const toggle = screen.getByLabelText('Keep notes');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
   it('toggling "Include table of contents" enables it', async () => {

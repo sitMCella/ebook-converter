@@ -19,13 +19,54 @@ pub async fn run_conversion(
     let path_owned = path.to_string();
     let output_folder = options.output_folder.clone();
 
-    emit_progress(app, &path_owned, "extracting_text", 0, "Extracting text from PDF...");
+    if cancel_token.load(Ordering::Relaxed) {
+        return Err("Conversion cancelled".to_string());
+    }
+
+    // Images are extracted before the text so each one can be anchored in its
+    // page's text at the position it occupies on the page.
+    emit_progress(app, &path_owned, "extracting_images", 0, "Extracting images...");
+
+    let mut images = if options.images.extract_images {
+        let app_ref = app;
+        let path_ref = path_owned.clone();
+        match image_extractor::extract_images(path, &options.images, &|msg| {
+            emit_progress(app_ref, &path_ref, "extracting_images", 10, msg);
+        }) {
+            Ok(imgs) => {
+                emit_progress(
+                    app,
+                    &path_owned,
+                    "extracting_images",
+                    20,
+                    &format!("Extracted {} image(s) total", imgs.len()),
+                );
+                imgs
+            }
+            Err(e) => {
+                log::warn!("Image extraction failed: {}", e);
+                emit_progress(
+                    app,
+                    &path_owned,
+                    "extracting_images",
+                    20,
+                    &format!("Image extraction skipped: {}", e),
+                );
+                Vec::new()
+            }
+        }
+    } else {
+        emit_progress(app, &path_owned, "extracting_images", 20, "Image extraction disabled");
+        Vec::new()
+    };
 
     if cancel_token.load(Ordering::Relaxed) {
         return Err("Conversion cancelled".to_string());
     }
 
-    let extracted = text_extractor::extract_text(path, &options.page_handling)?;
+    emit_progress(app, &path_owned, "extracting_text", 20, "Extracting text from PDF...");
+
+    let extracted = text_extractor::extract_text(path, &options.page_handling, &image_anchors(&images))?;
     let mut pages = extracted.pages;
     let mut first_content_page = extracted.first_page;
 
@@ -68,50 +109,15 @@ pub async fn run_conversion(
         return Err("Conversion cancelled".to_string());
     }
 
-    emit_progress(app, &path_owned, "detecting_structure", 40, "Detecting headings and structure...");
+    emit_progress(app, &path_owned, "detecting_structure", 50, "Detecting headings and structure...");
 
     let mut content = structure_detector::detect_structure(&pages, &options.structure);
 
-    emit_progress(app, &path_owned, "detecting_structure", 50, "Structure detection complete");
+    emit_progress(app, &path_owned, "detecting_structure", 70, "Structure detection complete");
 
     if cancel_token.load(Ordering::Relaxed) {
         return Err("Conversion cancelled".to_string());
     }
-
-    emit_progress(app, &path_owned, "extracting_images", 50, "Extracting images...");
-
-    let mut images = if options.images.extract_images {
-        let app_ref = app;
-        let path_ref = path_owned.clone();
-        match image_extractor::extract_images(path, &options.images, &|msg| {
-            emit_progress(app_ref, &path_ref, "extracting_images", 60, msg);
-        }) {
-            Ok(imgs) => {
-                emit_progress(
-                    app,
-                    &path_owned,
-                    "extracting_images",
-                    70,
-                    &format!("Extracted {} image(s) total", imgs.len()),
-                );
-                imgs
-            }
-            Err(e) => {
-                log::warn!("Image extraction failed: {}", e);
-                emit_progress(
-                    app,
-                    &path_owned,
-                    "extracting_images",
-                    70,
-                    &format!("Image extraction skipped: {}", e),
-                );
-                Vec::new()
-            }
-        }
-    } else {
-        emit_progress(app, &path_owned, "extracting_images", 70, "Image extraction disabled");
-        Vec::new()
-    };
 
     // Page-1 images are the cover art (already in the EPUB as the cover);
     // repeating them in the body shows the cover again, often as tiles.
@@ -122,7 +128,27 @@ pub async fn run_conversion(
         page >= first_content_page && !(cover_image.is_some() && page == 1)
     });
 
-    insert_images_into_content(&mut content, &images, first_content_page);
+    // Image lines anchored in the text of pages whose images were dropped
+    // above leave no resource behind; remove them. Kept images not anchored
+    // anywhere fall back to the end of their page.
+    let kept: std::collections::HashSet<String> =
+        images.iter().map(|img| img.resource_path()).collect();
+    content.retain(|c| match c {
+        structure_detector::StructuredContent::Image { resource_path, .. } => kept.contains(resource_path),
+        _ => true,
+    });
+    let placed: std::collections::HashSet<String> = content
+        .iter()
+        .filter_map(|c| match c {
+            structure_detector::StructuredContent::Image { resource_path, .. } => Some(resource_path.clone()),
+            _ => None,
+        })
+        .collect();
+    let unplaced: Vec<&image_extractor::ExtractedImage> = images
+        .iter()
+        .filter(|img| !placed.contains(&img.resource_path()))
+        .collect();
+    insert_images_into_content(&mut content, &unplaced, first_content_page);
 
     if cancel_token.load(Ordering::Relaxed) {
         return Err("Conversion cancelled".to_string());
@@ -211,9 +237,31 @@ fn image_page_number(img: &image_extractor::ExtractedImage) -> u32 {
         .unwrap_or(0)
 }
 
+/// Groups images by PDF page as text anchors, so `text_extractor` can place
+/// each image line at the image's position in its page's text.
+fn image_anchors(
+    images: &[image_extractor::ExtractedImage],
+) -> std::collections::HashMap<u32, Vec<text_extractor::ImageAnchor>> {
+    let mut anchors: std::collections::HashMap<u32, Vec<text_extractor::ImageAnchor>> =
+        std::collections::HashMap::new();
+    for img in images {
+        let Some(page_y) = img.page_y else { continue };
+        let page = image_page_number(img);
+        anchors.entry(page).or_default().push(text_extractor::ImageAnchor {
+            page_y,
+            mark: text_extractor::image_mark(
+                &img.resource_path(),
+                img.display_width_pct,
+                &format!("Image from page {}", page),
+            ),
+        });
+    }
+    anchors
+}
+
 fn insert_images_into_content(
     content: &mut Vec<structure_detector::StructuredContent>,
-    images: &[image_extractor::ExtractedImage],
+    images: &[&image_extractor::ExtractedImage],
     first_page: u32,
 ) {
     if images.is_empty() {
@@ -223,7 +271,7 @@ fn insert_images_into_content(
     let mut page_images: std::collections::HashMap<u32, Vec<&image_extractor::ExtractedImage>> =
         std::collections::HashMap::new();
 
-    for img in images {
+    for &img in images {
         page_images.entry(image_page_number(img)).or_default().push(img);
     }
 
@@ -236,14 +284,8 @@ fn insert_images_into_content(
                 let nodes: Vec<_> = imgs
                     .iter()
                     .map(|img| {
-                        let ext = match img.mime_type.as_str() {
-                            "image/jpeg" => "jpg",
-                            "image/png" => "png",
-                            "image/webp" => "webp",
-                            _ => "bin",
-                        };
                         structure_detector::StructuredContent::Image {
-                            resource_path: format!("images/{}_{}.{}", img.id, img.width, ext),
+                            resource_path: img.resource_path(),
                             alt: format!("Image from page {}", current_page),
                             display_width_pct: img.display_width_pct,
                         }
@@ -262,14 +304,8 @@ fn insert_images_into_content(
 
     if let Some(imgs) = page_images.remove(&current_page) {
         for img in imgs {
-            let ext = match img.mime_type.as_str() {
-                "image/jpeg" => "jpg",
-                "image/png" => "png",
-                "image/webp" => "webp",
-                _ => "bin",
-            };
             content.push(structure_detector::StructuredContent::Image {
-                resource_path: format!("images/{}_{}.{}", img.id, img.width, ext),
+                resource_path: img.resource_path(),
                 alt: format!("Image from page {}", current_page),
                 display_width_pct: img.display_width_pct,
             });
@@ -289,6 +325,7 @@ mod tests {
             width: 10,
             height: 10,
             display_width_pct: None,
+            page_y: None,
         }
     }
 
@@ -321,7 +358,8 @@ mod tests {
             Paragraph { text: "page 3".into() },
         ];
         let images = vec![test_image("img_p2_0_1"), test_image("img_p3_0_2")];
-        insert_images_into_content(&mut content, &images, 2);
+        let refs: Vec<_> = images.iter().collect();
+        insert_images_into_content(&mut content, &refs, 2);
         let positions = image_positions(&content);
         assert_eq!(positions.len(), 2);
         // Page-2 image lands before the first page break, page-3 image at the end.

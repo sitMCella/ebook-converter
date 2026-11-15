@@ -1,13 +1,21 @@
-use super::text_extractor::{CODE_BLOCK_START, CODE_BLOCK_END, HEADING_MARK};
+use super::text_extractor::{
+    CODE_BLOCK_END, CODE_BLOCK_START, HEADING_MARK, IMAGE_MARK, NOTE_FIELD_SEP, NOTE_REF_START, NOTE_START,
+};
 use super::StructureOptions;
 
 #[derive(Debug, Clone)]
 pub enum StructuredContent {
     Heading { level: u8, text: String },
     Paragraph { text: String },
-    ListItem { text: String, ordered: bool },
+    /// `number` is the item's printed label for ordered lists ("3." -> 3),
+    /// so a list split by an interleaved paragraph keeps its numbering.
+    ListItem { text: String, ordered: bool, number: Option<u32> },
     Image { resource_path: String, alt: String, display_width_pct: Option<u32> },
     Footnote { number: u32, text: String },
+    /// A note kept from the bottom of a PDF page (Keep notes on). `id` is
+    /// unique across the document and matches the `NOTE_REF_START` marks in
+    /// the text that cite it; `label` is the printed mark ("1", "*").
+    Note { id: u32, label: String, text: String },
     CodeBlock { text: String },
     BlankLine,
     PageBreak,
@@ -36,6 +44,18 @@ pub fn detect_structure(
         while line_idx < body_end {
             let line = lines[line_idx].trim();
 
+            if let Some(note) = parse_note_line(line) {
+                result.push(note);
+                line_idx += 1;
+                continue;
+            }
+
+            if let Some(image) = parse_image_line(line) {
+                result.push(image);
+                line_idx += 1;
+                continue;
+            }
+
             if line.chars().next() == Some(CODE_BLOCK_START) {
                 line_idx += 1;
                 let mut code_lines = Vec::new();
@@ -46,6 +66,28 @@ pub fn detect_structure(
                 // Skip the closing marker line itself, if found.
                 if line_idx < body_end {
                     line_idx += 1;
+                }
+                // MuPDF splits a listing into one text block per run of lines
+                // without a vertical gap, so a blank line inside the code
+                // ends up as two adjacent code blocks. Merge code blocks that
+                // are separated only by blank lines back into one listing.
+                loop {
+                    let mut peek = line_idx;
+                    while peek < body_end && lines[peek].trim().is_empty() {
+                        peek += 1;
+                    }
+                    if peek >= body_end || lines[peek].trim().chars().next() != Some(CODE_BLOCK_START) {
+                        break;
+                    }
+                    code_lines.push("");
+                    line_idx = peek + 1;
+                    while line_idx < body_end && lines[line_idx].trim().chars().next() != Some(CODE_BLOCK_END) {
+                        code_lines.push(lines[line_idx]);
+                        line_idx += 1;
+                    }
+                    if line_idx < body_end {
+                        line_idx += 1;
+                    }
                 }
                 result.push(StructuredContent::CodeBlock {
                     text: code_lines.join("\n"),
@@ -62,9 +104,26 @@ pub fn detect_structure(
             }
 
             if options.list_detection {
-                if let Some(item) = detect_list_item(line) {
-                    result.push(item);
+                if let Some(mut item) = detect_list_item(line) {
                     line_idx += 1;
+                    // A list item wrapped over several PDF lines arrives as
+                    // consecutive lines; join them into the one item so the
+                    // continuation keeps the item's indentation instead of
+                    // becoming a separate paragraph.
+                    if options.paragraph_detection {
+                        if let StructuredContent::ListItem { text, .. } = &mut item {
+                            while line_idx < body_end {
+                                let next = lines[line_idx].trim();
+                                if !is_continuation_line(next, options) {
+                                    break;
+                                }
+                                text.push(' ');
+                                text.push_str(next);
+                                line_idx += 1;
+                            }
+                        }
+                    }
+                    result.push(item);
                     continue;
                 }
             }
@@ -90,7 +149,7 @@ pub fn detect_structure(
                 line_idx += 1;
                 while line_idx < lines.len() {
                     let next = lines[line_idx].trim();
-                    if next.is_empty() {
+                    if next.is_empty() || next.starts_with(NOTE_START) || next.starts_with(IMAGE_MARK) {
                         break;
                     }
                     if options.detect_headings && next.chars().next() == Some(HEADING_MARK) {
@@ -124,7 +183,72 @@ pub fn detect_structure(
         result.push(StructuredContent::Footnote { number, text });
     }
 
-    result
+    place_notes_after_refs(result)
+}
+
+/// Parses a `NOTE_START` line written by `text_extractor` for a kept note.
+fn parse_note_line(line: &str) -> Option<StructuredContent> {
+    let rest = line.strip_prefix(NOTE_START)?;
+    let mut fields = rest.splitn(3, NOTE_FIELD_SEP);
+    let id = fields.next()?.parse().ok()?;
+    let label = fields.next()?.to_string();
+    let text = fields.next()?.trim().to_string();
+    Some(StructuredContent::Note { id, label, text })
+}
+
+/// Parses an `IMAGE_MARK` line written by `text_extractor::image_mark`.
+fn parse_image_line(line: &str) -> Option<StructuredContent> {
+    let rest = line.strip_prefix(IMAGE_MARK)?;
+    let mut fields = rest.splitn(3, NOTE_FIELD_SEP);
+    let resource_path = fields.next()?.to_string();
+    let display_width_pct = fields.next()?.parse().ok();
+    let alt = fields.next().unwrap_or("").to_string();
+    Some(StructuredContent::Image { resource_path, alt, display_width_pct })
+}
+
+/// True when `item`'s text holds a reference mark to note `id`.
+fn cites_note(item: &StructuredContent, id: u32) -> bool {
+    let text = match item {
+        StructuredContent::Heading { text, .. }
+        | StructuredContent::Paragraph { text }
+        | StructuredContent::ListItem { text, .. }
+        | StructuredContent::CodeBlock { text }
+        | StructuredContent::Note { text, .. } => text,
+        _ => return false,
+    };
+    text.contains(&format!("{NOTE_REF_START}{id}{NOTE_FIELD_SEP}"))
+}
+
+/// Moves every kept note to just after the block that cites it (after any
+/// notes already placed there), so a reader meets the note right where it is
+/// referenced. Notes nobody cites stay at the end of their page.
+fn place_notes_after_refs(content: Vec<StructuredContent>) -> Vec<StructuredContent> {
+    let (notes, mut result): (Vec<_>, Vec<_>) = content
+        .into_iter()
+        .enumerate()
+        .partition(|(_, c)| matches!(c, StructuredContent::Note { .. }));
+    if notes.is_empty() {
+        return result.into_iter().map(|(_, c)| c).collect();
+    }
+
+    for (orig_pos, note) in notes {
+        let StructuredContent::Note { id, .. } = &note else { unreachable!() };
+        let target = result.iter().position(|(_, c)| cites_note(c, *id));
+        let insert_at = match target {
+            Some(mut i) => {
+                i += 1;
+                while i < result.len() && matches!(result[i].1, StructuredContent::Note { .. }) {
+                    i += 1;
+                }
+                i
+            }
+            // Uncited: back where it was, i.e. before the first item that
+            // originally followed it.
+            None => result.iter().position(|(p, _)| *p > orig_pos).unwrap_or(result.len()),
+        };
+        result.insert(insert_at, (orig_pos, note));
+    }
+    result.into_iter().map(|(_, c)| c).collect()
 }
 
 /// Reads a `HEADING_MARK` + level-digit prefix (written by
@@ -151,6 +275,18 @@ fn strip_heading_mark(line: &str) -> &str {
     }
 }
 
+/// True when `next` continues the preceding text block: non-empty and not
+/// the start of a heading, list item or code block.
+fn is_continuation_line(next: &str, options: &StructureOptions) -> bool {
+    let first = next.chars().next();
+    match first {
+        None => false,
+        Some(c) if c == CODE_BLOCK_START || c == NOTE_START || c == IMAGE_MARK => false,
+        Some(c) if options.detect_headings && c == HEADING_MARK => false,
+        _ => !(options.list_detection && detect_list_item(next).is_some()),
+    }
+}
+
 fn detect_list_item(line: &str) -> Option<StructuredContent> {
     let trimmed = line.trim();
 
@@ -161,6 +297,7 @@ fn detect_list_item(line: &str) -> Option<StructuredContent> {
                 return Some(StructuredContent::ListItem {
                     text: rest.to_string(),
                     ordered: false,
+                    number: None,
                 });
             }
         }
@@ -168,9 +305,14 @@ fn detect_list_item(line: &str) -> Option<StructuredContent> {
 
     if let Some(rest) = strip_numbered_prefix(trimmed) {
         if !rest.is_empty() {
+            let number = trimmed
+                .split(|c: char| !c.is_ascii_digit())
+                .next()
+                .and_then(|d| d.parse().ok());
             return Some(StructuredContent::ListItem {
                 text: rest.to_string(),
                 ordered: true,
+                number,
             });
         }
     }
@@ -405,6 +547,7 @@ fn extract_page_footnotes(lines: &[&str]) -> (Vec<(u32, String)>, usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::conversion::text_extractor::NOTE_REF_END;
 
     fn default_options() -> StructureOptions {
         StructureOptions {
@@ -450,6 +593,89 @@ mod tests {
 
         let list_count = result.iter().filter(|c| matches!(c, StructuredContent::ListItem { ordered: true, .. })).count();
         assert_eq!(list_count, 2);
+    }
+
+    #[test]
+    fn wrapped_list_item_lines_join_into_one_item() {
+        let pages = vec![
+            "1. Test-driven development (TDD) helps us to build code that is correct and enables\nus to refactor or add new features.\n\nNext paragraph.".to_string(),
+        ];
+        let result = detect_structure(&pages, &default_options());
+
+        let items: Vec<&String> = result
+            .iter()
+            .filter_map(|c| match c {
+                StructuredContent::ListItem { text, .. } => Some(text),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].ends_with("enables us to refactor or add new features."));
+        let paragraphs = result.iter().filter(|c| matches!(c, StructuredContent::Paragraph { .. })).count();
+        assert_eq!(paragraphs, 1);
+    }
+
+    #[test]
+    fn wrapped_list_item_stops_at_next_item() {
+        let pages = vec!["- First item\ncontinued\n- Second item".to_string()];
+        let result = detect_structure(&pages, &default_options());
+
+        let items: Vec<&String> = result
+            .iter()
+            .filter_map(|c| match c {
+                StructuredContent::ListItem { text, .. } => Some(text),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(items, vec!["First item continued", "Second item"]);
+    }
+
+    #[test]
+    fn note_moves_after_citing_paragraph() {
+        let note = format!("{NOTE_START}3{NOTE_FIELD_SEP}1{NOTE_FIELD_SEP}The note text.");
+        let page = format!(
+            "First paragraph about algorithms.{NOTE_REF_START}3{NOTE_FIELD_SEP}1{NOTE_REF_END}\n\nSecond paragraph.\n\n{note}"
+        );
+        let result = detect_structure(&[page], &default_options());
+        let kinds: Vec<&str> = result
+            .iter()
+            .filter_map(|c| match c {
+                StructuredContent::Paragraph { .. } => Some("p"),
+                StructuredContent::Note { .. } => Some("note"),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(kinds, vec!["p", "note", "p"]);
+        assert!(result.iter().any(|c| matches!(
+            c,
+            StructuredContent::Note { id: 3, label, text } if label == "1" && text == "The note text."
+        )));
+    }
+
+    #[test]
+    fn uncited_note_stays_at_end_of_its_page() {
+        let note = format!("{NOTE_START}1{NOTE_FIELD_SEP}*{NOTE_FIELD_SEP}Lonely note.");
+        let pages = vec![format!("Page one.\n\n{note}"), "Page two.".to_string()];
+        let result = detect_structure(&pages, &default_options());
+        let note_pos = result.iter().position(|c| matches!(c, StructuredContent::Note { .. })).unwrap();
+        let break_pos = result.iter().position(|c| matches!(c, StructuredContent::PageBreak)).unwrap();
+        assert!(note_pos < break_pos);
+    }
+
+    #[test]
+    fn note_line_ends_a_paragraph_without_blank_line() {
+        let note = format!("{NOTE_START}1{NOTE_FIELD_SEP}1{NOTE_FIELD_SEP}Note.");
+        let page = format!("Body line one\n{note}");
+        let result = detect_structure(&[page], &default_options());
+        assert!(matches!(&result[0], StructuredContent::Paragraph { text } if text == "Body line one"));
+        assert!(matches!(&result[1], StructuredContent::Note { .. }));
+    }
+
+    #[test]
+    fn ordered_list_item_keeps_its_number() {
+        let pages = vec!["12. Twelfth item".to_string()];
+        let result = detect_structure(&pages, &default_options());
+        assert!(result.iter().any(|c| matches!(c, StructuredContent::ListItem { number: Some(12), .. })));
     }
 
     #[test]
@@ -691,6 +917,30 @@ mod tests {
     }
 
     #[test]
+    fn adjacent_code_blocks_separated_by_blank_lines_merge() {
+        let (s, e) = (CODE_BLOCK_START, CODE_BLOCK_END);
+        let page = format!(
+            "{s}\nimport requests\n{e}\n\n{s}\nparams = dict()\nparsed = get()\n{e}\n\n\
+             {s}\nfor r in results:\n    print(r)\n{e}\n\nDo a search\n\n{s}\nimport json\n{e}"
+        );
+        let result = detect_structure(&[page], &default_options());
+
+        let code_blocks: Vec<_> = result.iter()
+            .filter_map(|c| match c {
+                StructuredContent::CodeBlock { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            code_blocks,
+            vec![
+                "import requests\n\nparams = dict()\nparsed = get()\n\nfor r in results:\n    print(r)",
+                "import json",
+            ]
+        );
+    }
+
+    #[test]
     fn code_block_lines_are_not_parsed_as_paragraphs_or_headings() {
         let page = format!(
             "{}\nCQRS\ndef allocate(line):\n    pass\n{}",
@@ -720,4 +970,36 @@ mod tests {
             .collect();
         assert_eq!(paragraphs, vec!["Intro paragraph.", "Closing paragraph."]);
     }
+
+    #[test]
+    fn image_line_becomes_image_between_paragraphs() {
+        use crate::conversion::text_extractor::image_mark;
+        let mark = image_mark("images/img_p5_0_1_400.jpg", None, "Image from page 5");
+        let pages = vec![format!(
+            "Text before the figure.\n{mark}\n\nFigure P-2. Layered architecture\n\nText after."
+        )];
+        let result = detect_structure(&pages, &default_options());
+        let kinds: Vec<String> = result
+            .iter()
+            .filter_map(|c| match c {
+                StructuredContent::Paragraph { text } => Some(format!("P:{text}")),
+                StructuredContent::Image { resource_path, alt, display_width_pct } => {
+                    assert_eq!(alt, "Image from page 5");
+                    assert_eq!(*display_width_pct, None);
+                    Some(format!("I:{resource_path}"))
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                "P:Text before the figure.",
+                "I:images/img_p5_0_1_400.jpg",
+                "P:Figure P-2. Layered architecture",
+                "P:Text after.",
+            ]
+        );
+    }
 }
+

@@ -263,6 +263,16 @@ export function ConversionOptions({ file }) {
               onReset={() => resetOverride('pageHandling', 'includeToc')}
             />
           </OverrideRow>
+
+          <OverrideRow label="Keep notes">
+            <ToggleControl
+              value={overrides.pageHandling?.keepNotes}
+              defaultValue={globalSettings.pageHandling.keepNotes}
+              label="Keep notes"
+              onChange={(v) => setOverride('pageHandling', 'keepNotes', v)}
+              onReset={() => resetOverride('pageHandling', 'keepNotes')}
+            />
+          </OverrideRow>
         </div>
       )}
     </div>

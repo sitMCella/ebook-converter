@@ -32,6 +32,7 @@ export const DEFAULT_SETTINGS = {
     removePageNumbers: true,
     coverPage: 'auto',
     includeToc: false,
+    keepNotes: false,
   },
 };
 

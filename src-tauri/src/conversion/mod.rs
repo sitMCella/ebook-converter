@@ -70,6 +70,10 @@ pub struct PageHandlingOptions {
     /// default: the EPUB navigation document already provides a TOC.
     #[serde(default)]
     pub include_toc: bool,
+    /// Keep notes (footnotes at the bottom of PDF pages) in the EPUB body.
+    /// Off by default: MuPDF often places them in the middle of the prose.
+    #[serde(default)]
+    pub keep_notes: bool,
 }
 
 #[derive(Serialize, Clone)]

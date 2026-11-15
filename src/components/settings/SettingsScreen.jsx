@@ -332,6 +332,14 @@ export function SettingsScreen() {
                 label="Include table of contents"
               />
             </SettingRow>
+            <SettingRow label="Keep notes">
+              <SaveIndicator visible={lastChanged === 'pageHandling.keepNotes'} />
+              <Toggle
+                checked={settings.pageHandling.keepNotes}
+                onChange={(v) => handleChange('pageHandling', 'keepNotes', v)}
+                label="Keep notes"
+              />
+            </SettingRow>
           </SettingGroup>
         </div>
       </div>
